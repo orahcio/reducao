@@ -1,3 +1,7 @@
 venv/
 .directory
 .python-version
+*.pyc
+launch.json
+*.fit
+*.fits
