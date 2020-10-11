@@ -1,13 +1,14 @@
 from bokeh.plotting import figure
 from bokeh.embed import components
+from bokeh.events import Tap
 from bokeh.models import ColumnDataSource, DataTable, TableColumn, PointDrawTool, Spinner, WheelZoomTool, RadioGroup,\
-    CustomJS, Paragraph
+    CustomJS, Paragraph, Button, FileInput
 from bokeh.layouts import column, row
 
 import colorcet as cc
 
 from flask import Flask, flash, render_template, request, redirect, url_for
-from flask import send_from_directory
+from flask import send_from_directory, jsonify, make_response
 from werkzeug.utils import secure_filename
 import os
 
@@ -20,7 +21,7 @@ from pybase64 import b64decode
 
 
 UPLOAD_FOLDER = './upfolder'
-ALLOWED_EXTENSIONS = ['fit', 'fits']
+ALLOWED_EXTENSIONS = ['fit', 'fits','corr']
 
 
 app = Flask(__name__)
@@ -45,6 +46,22 @@ def normal(valores):
 def interface():
     
     return render_template("interface.html")
+
+
+@app.route('/corfit', methods=['POST'])
+def upload_cor():
+
+    req = request.get_json()
+    print(req)
+    # file = request.files['file']
+
+    # if file and allowed_file(file.filename):
+        # filename = secure_filename(file.filename)
+        # file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
+
+        # return 3 # redirect(url_for('plotfits',filename=filename))
+
+    return request.files
 
 
 @app.route('/', methods=['GET', 'POST'])
@@ -92,18 +109,25 @@ def plotfits(filename):
         TableColumn(field='tipo',title='tipo')
     ], editable=True)
     
+    # Plota a imagem do arquivo fit
     p = figure(plot_width=w, plot_height=h,tooltips=[("x", "$x"), ("y", "$y"), ("value", "@image")],\
         active_scroll='wheel_zoom')
     p.image(image=[stretch(normal(img))], x=0, y=0, dw=w, dh=h, palette=cc.CET_CBL2, level="image")
     p.x_range.range_padding = p.y_range.range_padding = 0
     p.grid.grid_line_width = 0
 
+    # Os círculos que serão inseridos
     c = p.circle('x','y', source=source, color='red', fill_color=None, radius=8, line_width=2)
     cd = p.circle_dot('x','y', source=source, color='red', size=2)
     tool = PointDrawTool(renderers=[c,cd],empty_value='obj')
     p.add_tools(tool)
     p.toolbar.active_tap = tool
 
+    # Muda o raio da abertura fotométrica
+    spinner = Spinner(title="Raio", low=1, high=40, step=0.5, value=8, width=80)
+    spinner.js_link('value', c.glyph, 'radius')
+
+    # Selecionar o tipo de fonte luminosa: obj, src ou sky
     radio_title = Paragraph(text='Escolha o tipo:')
     LABELS = ['obj','src','sky']
     radio_group = RadioGroup(labels=LABELS, active=0)
@@ -114,11 +138,94 @@ def plotfits(filename):
     ''')
     radio_group.js_on_change('active',callback)
 
-    spinner = Spinner(title="Raio", low=1, high=40, step=0.5, value=8, width=80)
-    spinner.js_link('value', c.glyph, 'radius')
+    # Fazer o upload do corr.fit da imagem
+    upload_cor = FileInput()
+    upload_cor.js_on_change('value',CustomJS(code = '''
 
-    div, script = components(row(column(spinner,radio_title,radio_group), column(p,tabela, sizing_mode='scale_height')))
+            var entry = {
+                arquivo: atob(cb_obj.value),
+                }
+            console.log(entry)
+
+            fetch(`${window.origin}/corfit`, {
+                method: "POST",
+                credentials: "include",
+                body: JSON.stringify(entry),
+                cache: "no-cache",
+                headers: new Headers({
+                    "content-type": "application/json"
+                })
+            })
+            .then(function (response) {
+                if (response.status !== 200) {
+                    console.log(`Looks like there was a problem. Status code: ${response.status}`);
+                    return;
+                }
+                response.json().then(function (data) {
+                    console.log('Acabaou de chegar: ', data);
+                });
+            })
+            .catch(function (error) {
+                console.log("Fetch error: " + error);
+            });
+    '''))
+
+    # o Botão de salvar irá enviar um json para o servidor que irá ler e fazer os procedimentos posteriores
+    callback_botao = CustomJS(args=dict(source=source), code='''
+            var dados = source.data;
+            var entry = {
+                tipo: dados['tipo'],
+                x: dados['x'],
+                y: dados['y'],
+            }
+
+            fetch(`${window.origin}/resultado`, {
+                method: "POST",
+                credentials: "include",
+                body: JSON.stringify(entry),
+                cache: "no-cache",
+                headers: new Headers({
+                    "content-type": "application/json"
+                })
+            })
+            .then(function (response) {
+                if (response.status !== 200) {
+                    console.log(`Looks like there was a problem. Status code: ${response.status}`);
+                    return;
+                }
+                response.json().then(function (data) {
+                    console.log('Acabaou de chegar: ',data[x]);
+                });
+            })
+            .catch(function (error) {
+                console.log("Fetch error: " + error);
+            });
+
+    ''')
+    salvar = Button(label='Salvar coordenadas', button_type="success")
+    salvar.js_on_click(callback_botao)
+
+    div, script = components(row(column(spinner,radio_title,radio_group,upload_cor,salvar), column(p,tabela, sizing_mode='scale_height')))
     return render_template('plot.html', the_div=div, the_script=script)
+
+
+@app.route("/resultado", methods=["POST"])
+def create_entry():
+    '''
+    Rota para receber tabela de dados a partir de um envio do navegador
+    '''
+
+    req = request.get_json()
+
+    print(req)
+
+    # res = make_response(jsonify({"message": "OK"}), 200)
+    res = make_response(req, 200)
+
+    return res
+
+def click():
+    print('Clicado')
 
 
 @app.route('/uploads/<filename>')
