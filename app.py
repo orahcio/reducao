@@ -52,7 +52,7 @@ def interface():
 def upload_cor():
 
     req = request.get_json()
-    print(req)
+    print(req['url'])
     # file = request.files['file']
 
     # if file and allowed_file(file.filename):
@@ -143,6 +143,7 @@ def plotfits(filename):
     upload_cor.js_on_change('value',CustomJS(code = '''
 
             var entry = {
+                url: `${window.location.href}`,
                 arquivo: atob(cb_obj.value),
                 }
             console.log(entry)
