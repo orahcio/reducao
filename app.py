@@ -8,16 +8,20 @@ from bokeh.layouts import column, row
 import colorcet as cc
 
 from flask import Flask, flash, render_template, request, redirect, url_for
-from flask import send_from_directory, jsonify, make_response
+from flask import send_from_directory, jsonify, make_response, jsonify
 from werkzeug.utils import secure_filename
 import os
 
 from astropy.io import fits
 from astropy.visualization import HistEqStretch
+from astropy.table import Table
+from astropy.coordinates import SkyCoord, match_coordinates_3d
+
+import pandas as pd
 
 import numpy as np
 
-from pybase64 import b64decode
+import base64
 
 
 UPLOAD_FOLDER = './upfolder'
@@ -52,16 +56,47 @@ def interface():
 def upload_cor():
 
     req = request.get_json()
-    print(req['url'])
-    # file = request.files['file']
+    
+    # decodificando a string recebida
+    decoded = base64.b64decode(req['arquivo'])
 
-    # if file and allowed_file(file.filename):
-        # filename = secure_filename(file.filename)
-        # file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
+    # fazendo upload atualizando o nome do arquivo para upload
+    filename = UPLOAD_FOLDER+'/'+req['url'].split('/')[-1].strip('.fit')+'.corr'
+    with open(filename, 'wb') as f:
+        f.write(decoded)
 
-        # return 3 # redirect(url_for('plotfits',filename=filename))
+    # pegando a tabela com as coordenadas de estrelas selecionadas
+    data = pd.DataFrame(dict(
+        ra=req['ra'],
+        dec=req['dec'],
+        x=req['x'],
+        y=req['y'],
+        tipo = req['tipo']
+        ))
+    data = data[data['tipo']=='src']
 
-    return request.files
+    # tabela com os dados que acabaram de ser subidos
+    cordata = Table.read(filename).to_pandas()
+
+    # fazendo correspondência entre coordenadas
+    if len(data)>0:
+        m = SkyCoord([(x,y,0) for x,y in data[['x','y']]], unit='pixel', representation='cartesian')
+        c = SkyCoord([(x,y,0) for x,y in cordata[['x','y']]], unit='pixel', representation='cartesian')
+        idx, _, _ = match_coordinates_3d(m,c)
+        cordata = cordata[idx]
+
+        # atualisando os dados para as coordenadas do arquivo corr
+        data['x'] = cordata['field_x']
+        data['y'] = cordata['field_y']
+        data['ra'] = cordata['field_ra']
+        data['dec'] = cordata['field_dec']
+
+        return make_response(data.to_json())
+
+    data = cordata[['field_ra','field_dec','field_x','field_y']]
+    data.columns = ['ra','dec','x','y']
+    
+    return make_response(data.to_json(),200)
 
 
 @app.route('/', methods=['GET', 'POST'])
@@ -99,8 +134,16 @@ def plotfits(filename):
     stretch = HistEqStretch(img) # Histograma, melhor função para granular a imagem
     h,w = img.shape # número de linhas e colunas da matriz da imagem
 
-    # Fonte que será usada para fazer computação
-    source = ColumnDataSource(dict(x=[], y=[], tipo=[]))
+    # Dados que serão usados para fazer computação e visualizar os pontos
+    source = ColumnDataSource(dict(
+        fit=[], # quando salvar estado salvar tabela
+        ra = [],
+        dec=[],
+        x=[],
+        y=[],
+        tipo=[], # se é obj, src ou sky
+        banda=[] # o filtro da imagem
+        ))
 
     # Constrói a tabaela de dados que poderá ser usada para designar as posições do objeto, estrela e céu
     tabela = DataTable(source=source,columns=[
@@ -140,11 +183,19 @@ def plotfits(filename):
 
     # Fazer o upload do corr.fit da imagem
     upload_cor = FileInput()
-    upload_cor.js_on_change('value',CustomJS(code = '''
+    upload_cor.js_on_change('value',CustomJS(args = dict(source=source), code = '''
+
+            var data = source.data;
+            console.log(data)
 
             var entry = {
                 url: `${window.location.href}`,
-                arquivo: atob(cb_obj.value),
+                ra: data['ra'],
+                dec: data['dec'],
+                x: data['x'],
+                y: data['y'],
+                tipo: data['tipo'],
+                arquivo: cb_obj.value,
                 }
             console.log(entry)
 
@@ -162,8 +213,21 @@ def plotfits(filename):
                     console.log(`Looks like there was a problem. Status code: ${response.status}`);
                     return;
                 }
-                response.json().then(function (data) {
+                response.json().then(function (resp) {
+                    let aux = window.location.pathname
+                    aux = aux.slice(6,aux.length)
+                    for(var i in resp['ra']) {
+                        data['ra'].push(resp['ra'][i])
+                        data['dec'].push(resp['dec'][i])
+                        data['x'].push(resp['x'][i])
+                        data['y'].push(resp['y'][i])
+                        data['tipo'].push('src')
+                        data['banda'].push('undef')
+                        data['fit'].push(aux)
+                    }
+
                     console.log('Acabaou de chegar: ', data);
+                    source.change.emit();
                 });
             })
             .catch(function (error) {
