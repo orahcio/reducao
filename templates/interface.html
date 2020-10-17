@@ -6,10 +6,13 @@
     <link href="http://cdn.pydata.org/bokeh/release/bokeh-widgets-2.2.1.min.css" rel="stylesheet">
   </head>
   <body>
-    <h1>Exemplo de botão de entrada de dados</h1>
+    <h1>Inicia a redução fazendo o upload da imagem</h1>
     <form method="POST" action="" enctype="multipart/form-data">
-      <p><input type="file" name="file"></p>
-      <p><input type="submit" value="Submit"></p>
+      <p>Escolha um arquivo .fits ou .fit<br>
+        <input type="file" name="fits"></p>
+      <p>Escolha o arquivo .corr obtido do astrometry.net<br>
+        <input type="file" name="corr"></p>
+      <p><input type="submit" value="Iniciar"></p>
     </form>
     <!-- {{ the_div|safe }} -->
     <!-- <script src="https://cdn.bokeh.org/bokeh/release/bokeh-2.2.1.min.js" crossorigin="anonymous"></script> -->

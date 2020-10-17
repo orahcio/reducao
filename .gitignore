@@ -7,3 +7,5 @@ launch.json
 *.fits
 .vscode
 *.ipynb
+*.corr
+*.xlsx
