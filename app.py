@@ -2,7 +2,7 @@ from bokeh.plotting import figure
 from bokeh.embed import components
 from bokeh.events import Tap
 from bokeh.models import ColumnDataSource, DataTable, TableColumn, PointDrawTool, Spinner, WheelZoomTool, RadioGroup,\
-    CustomJS, Paragraph, Button, Slider
+    CustomJS, Paragraph, Button, Slider, TextInput, Toggle
 from bokeh.layouts import column, row
 
 import colorcet as cc
@@ -17,6 +17,9 @@ from astropy.io import fits
 from astropy.visualization import HistEqStretch, ContrastBiasStretch
 from astropy.table import Table
 from astropy.coordinates import SkyCoord, match_coordinates_3d
+from astroquery.astrometry_net import AstrometryNet
+from astroquery.exceptions import TimeoutError
+from astropy.wcs import WCS
 
 import pandas as pd
 
@@ -27,6 +30,7 @@ import base64
 
 UPLOAD_FOLDER = './upfolder'
 ALLOWED_EXTENSIONS = ['fit', 'fits','corr']
+FITs = '[.fit|.fits]'
 
 
 app = Flask(__name__)
@@ -67,7 +71,7 @@ def upload_cor():
     decoded = base64.b64decode(req['arquivo'])
 
     # fazendo upload atualizando o nome do arquivo para upload
-    filename = UPLOAD_FOLDER+'/'+req['url'].split('/')[-1].strip('.fit')+'.corr'
+    filename = UPLOAD_FOLDER+'/'+req['url'].split('/')[-1].strip(FITs)+'.corr'
     with open(filename, 'wb') as f:
         f.write(decoded)
 
@@ -148,8 +152,10 @@ def plotfits(filename):
     # Abrindo imagem
     with fits.open('upfolder/'+filename) as f:
         img = f[0].data
+        # Caso tenha correção não ativa o botão para pedir
+        celestial = WCS(f[0].header).has_celestial
     
-
+    # Uma matriz pra fazer testes
     # img = np.array([[0,  1,  2,  3],
                     # [4,  5,  6,  7],
                     # [8,  9, 10, 11]])
@@ -180,6 +186,8 @@ def plotfits(filename):
     tabela = DataTable(source=source,columns=[
         TableColumn(field='x',title='x'),
         TableColumn(field='y',title='y'),
+        TableColumn(field='ra',title='ra'),
+        TableColumn(field='dec',title='dec'),
         TableColumn(field='tipo',title='tipo')
     ], editable=True)
     
@@ -211,98 +219,217 @@ def plotfits(filename):
     radio_group = RadioGroup(labels=LABELS, active=0)
 
     # Evento de mudança da tabela de dados, para inserir dados padrão nas colunas inalteradas
-    source.js_on_change('data', CustomJS(args=dict(radio=radio_group), code='''
-            var data = cb_obj.data;
+    source.js_on_change('data', CustomJS(args=dict(radio=radio_group,add=celestial), code='''
+    var data = cb_obj.data;
 
-            const n = data['x'].length;
-            const labels = radio.labels;
-            var aux = `${window.location.pathname}`;
-            aux = aux.slice(6,aux.length);
-            if(data['tipo'][n-1]=='na') {
-                data['fit'][n-1] = aux;
-                data['tipo'][n-1] = labels[radio.active];
-                data['banda'][n-1] = 'undef';
+    console.log(add)
+
+    const n = data['x'].length;
+    const labels = radio.labels;
+    var aux = `${window.location.pathname}`;
+    aux = aux.slice(6,aux.length);
+    if(data['tipo'][n-1]=='na') {
+        data['fit'][n-1] = aux;
+        data['tipo'][n-1] = labels[radio.active];
+        data['banda'][n-1] = 'undef';
+    }
+
+    if(add) {
+        entry = {
+            name: aux,
+            x: data['x'][n-1],
+            y: data['y'][n-1]
+        }
+
+        fetch(`${window.origin}/add`, {
+            method: "POST",
+            credentials: "include",
+            body: JSON.stringify(entry),
+            cache: "no-cache",
+            headers: new Headers({
+                "content-type": "application/json"
+            })
+        })
+        .then(function (response) {
+            if (response.status !== 200) {
+                console.log(`Looks like there was a problem. Status code: ${response.status}`);
+                return;
             }
+            response.json().then(function (table) {
+                data['ra'][n-1] = table['ra']);
+                data['dec'][n-1] = table['dec']
+            });
+        })
+        .catch(function (error) {
+            console.log("Fetch error: " + error);
+        });
+    }
 
-            cb_obj.change.emit();
+    cb_obj.change.emit();
     '''))
     # Fazer o upload do corr.fit da imagem (defasado)
 
     contrast = Slider(start=-1, end=6, value=1, step=0.05, title="Contraste")
     contrast.js_on_change('value',CustomJS(args = dict(source=im.data_source, im=nimg), code = '''
 
-            const x = im
-            var y = source.data['image'][0];
-            // console.log(y)
-            const ni = y.length
-            const nj = y[0].length
-            const n = ni*nj
-            var c = cb_obj.value
-            // console.log(c)
-            var max = 0 
-            var min = 2**64-1
+    const x = im
+    var y = source.data['image'][0];
+    // console.log(y)
+    const ni = y.length
+    const nj = y[0].length
+    const n = ni*nj
+    var c = cb_obj.value
+    // console.log(c)
+    var max = 0 
+    var min = 2**64-1
 
-            // console.log('x: ', x) 
-            // Clip values
-            const clip = (y) => {
-                for(let i=0;i<ni;i++) {
-                    for(let j=0;j<nj;j++) {
-                        if(max<y[i][j]) { max=y[i][j] }
-                        if(min>y[i][j]) { min=y[i][j] }
-                    }
-                }
-                for(let i=0;i<ni;i++) {
-                    for(let j=0;j<nj;j++) {
-                        y[i][j] = (y[i][j]-min)/(max-min)
-                    }
-                }
-                return y
+    // console.log('x: ', x) 
+    // Clip values
+    const clip = (y) => {
+        for(let i=0;i<ni;i++) {
+            for(let j=0;j<nj;j++) {
+                if(max<y[i][j]) { max=y[i][j] }
+                if(min>y[i][j]) { min=y[i][j] }
             }
-            y = clip(y)
-            for(let i=0;i<ni;i++) {
-                for(let j=0;j<nj;j++) {
-                    y[i][j] = Math.pow(x[i][j]+1e-8,10**c)
-                }
+        }
+        for(let i=0;i<ni;i++) {
+            for(let j=0;j<nj;j++) {
+                y[i][j] = (y[i][j]-min)/(max-min)
             }
-            y = clip(y)
-            source.change.emit()
+        }
+        return y
+    }
+    y = clip(y)
+    for(let i=0;i<ni;i++) {
+        for(let j=0;j<nj;j++) {
+            y[i][j] = Math.pow(x[i][j]+1e-8,10**c)
+        }
+    }
+    y = clip(y)
+    source.change.emit()
     '''))
 
     # o Botão de salvar irá enviar um json para o servidor que irá ler e fazer os procedimentos posteriores
     callback_botao = CustomJS(args=dict(source=source), code='''
 
-            var entry = source.data;
-            console.log(entry)
+    var entry = source.data;
+    console.log(entry)
 
-            fetch(`${window.origin}/resultado`, {
-                method: "POST",
-                credentials: "include",
-                body: JSON.stringify(entry),
-                cache: "no-cache",
-                headers: new Headers({
-                    "content-type": "application/json"
-                })
-            })
-            .then(function (response) {
-                if (response.status !== 200) {
-                    console.log(`Looks like there was a problem. Status code: ${response.status}`);
-                    return;
-                }
-                response.json().then(function (data) {
-                    console.log('Acabaou de chegar: ',data['x']);
-                });
-            })
-            .catch(function (error) {
-                console.log("Fetch error: " + error);
-            });
+    fetch(`${window.origin}/resultado`, {
+        method: "POST",
+        credentials: "include",
+        body: JSON.stringify(entry),
+        cache: "no-cache",
+        headers: new Headers({
+            "content-type": "application/json"
+        })
+    })
+    .then(function (response) {
+        if (response.status !== 200) {
+            console.log(`Looks like there was a problem. Status code: ${response.status}`);
+            return;
+        }
+        response.json().then(function (data) {
+            console.log('Acabaou de chegar: ',data['x']);
+        });
+    })
+    .catch(function (error) {
+        console.log("Fetch error: " + error);
+    });
 
     ''')
     salvar = Button(label='Salvar tabela', button_type="success")
     salvar.js_on_click(callback_botao)
 
-    div, script = components(row(column(spinner,contrast,radio_title,radio_group,salvar), column(p,tabela, sizing_mode='scale_height')))
+    apikey_input = TextInput(title='Apikey do Astrometry.net', placeholder='digite a chave aqui')
+    send_astrometry = Toggle(label='Solução de placa do astrometry.net', disabled=celestial)
+    send_astrometry.js_on_click(CustomJS(args=dict(key=apikey_input, source=source), code='''
+    send_astrometry(cb_obj,key,source);
+    '''))
+
+    test = Toggle(label='Teste',button_type='success')
+    test.js_on_click(CustomJS(code='''
+    f(cb_obj);
+    '''))
+
+    div, script = components(row(column(spinner,contrast,radio_title,radio_group,
+                                        salvar,apikey_input,send_astrometry,test),
+                                 column(p,tabela, sizing_mode='scale_width')))
     return render_template('plot.html', the_div=div, the_script=script)
 
+
+@app.route('/add', methods=['POST'])
+def add_radec():
+
+    return 'Oi'
+
+
+def solveplateastrometry(key,data,force_upload=False):
+    ast = AstrometryNet()
+    ast.api_key = key
+
+    try_again = True
+    submission_id = None
+
+    while try_again:
+        try:
+            if not submission_id:
+                if isinstance(data,str):
+                    wcs_header = ast.solve_from_image(data, force_image_upload=force_upload,
+                                 submission_id=submission_id)
+                    print('Com imagem\n',wcs_header)
+                elif isinstance(data,pd.DataFrame):
+                    print(data)
+                    filename = data.iloc[0,2]
+                    with fits.open('upfolder/'+filename) as f:
+                        w, h = f[0].data.shape
+                    wcs_header = ast.solve_from_source_list(data['x'], data['y'],
+                                 submission_id=submission_id, image_width=w, image_height=h)
+                    print('Com dados\n',wcs_header)
+            else:
+                wcs_header = ast.monitor_submission(submission_id,
+                                 solve_timeout=120)
+                print('Buscando algumas vezes\n',wcs_header)
+        except TimeoutError as e:
+            submission_id = e.args[1]
+        else:
+            # got a result, so terminate
+            try_again = False
+
+    return wcs_header
+
+
+@app.route("/astrometry_net/<key>/<filename>", methods=["POST","GET"])
+def astrometrysolve(key,filename):
+    if request.method=='POST':
+
+        req = request.get_json()
+        data = pd.DataFrame(req)
+        sdata = data[data['tipo']=='src']
+
+        # Primeira tentativa apenas com a lista de estrelas
+        if len(data):
+            print('Tentando com a lista de coordenadas')
+            wcs_header = solveplateastrometry(key,sdata[['x','y','fit']])
+        else:
+            print('Tentando com a imagem do photutils')
+            wcs_header = solveplateastrometry(key,filename)
+        print('Resultado 1\n', wcs_header)
+
+        if not isinstance(wcs_header,fits.Header):
+            print('Tentando com upload da imagem')
+            wcs_header = solveplateastrometry(key,filename,force_upload=True)
+            print('Resultado 2\n', wcs_header)
+
+        if isinstance(wcs_header,fits.Header):
+            with fits.open('upfolder/'+filename,'update') as f:
+                f[0].header = f[0].header+wcs_header
+            
+            return make_response({'message': 'OK'}, 200)
+
+        return make_response(jsonify({'message': 'NO'}),200)
+
+    # return redirect(url_for('plotfits',filename=filename))
 
 @app.route("/resultado", methods=["POST"])
 def create_entry():
@@ -313,18 +440,16 @@ def create_entry():
     req = request.get_json()
 
     out = pd.DataFrame(req)
-    out[['x','y','tipo']].to_excel('upfolder/'+out['fit'][0].strip('[.fit|.fits]')+'.xlsx',
-                                    index=False)
+    out.to_excel('upfolder/'+out['fit'][0].strip(FITs)+'.xlsx',
+                 index=False)
 
-    print(out)
-
-    # res = make_response(jsonify({"message": "OK"}), 200)
-    res = make_response(req, 200)
+    res = make_response(jsonify({"message": "Arquivo salvo"}), 200)
+    # res = make_response(req, 200)
 
     return res
 
 
-@app.route('/uploads/<filename>')
+@app.route('/download/<filename>')
 def uploaded_file(filename):
     return send_from_directory(app.config['UPLOAD_FOLDER'],
                                filename)
