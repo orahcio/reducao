@@ -1,5 +1,5 @@
 
-function source_onchange(cb_obj, radio, add) {
+function source_onchange(cb_obj, radio, r) {
     var data = cb_obj.data;
 
     const n = data['x'].length;
@@ -13,39 +13,41 @@ function source_onchange(cb_obj, radio, add) {
     }
     cb_obj.change.emit();
 
-    if(add) {
-        entry = {
-            name: aux,
-            x: data['x'][n-1],
-            y: data['y'][n-1]
-        }
-
-        fetch(`${window.origin}/add`, {
-            method: "POST",
-            credentials: "include",
-            body: JSON.stringify(entry),
-            cache: "no-cache",
-            headers: new Headers({
-                "content-type": "application/json"
-            })
-        })
-        .then(function (response) {
-            if (response.status !== 200) {
-                console.log(`Looks like there was a problem. Status code: ${response.status}`);
-                return;
-            }
-            response.json().then(function (table) {
-                data['ra'][n-1] = table['ra'];
-                data['dec'][n-1] = table['dec'];
-                cb_obj.change.emit()
-                console.log('Deu certo')
-            });
-        })
-        .catch(function (error) {
-            console.log("Fetch error: " + error);
-        });
+    entry = {
+        name: aux,
+        r: r,
+        x: data['x'][n-1],
+        y: data['y'][n-1],
+        ra: data['ra'][n-1],
+        dec: data['dec'][n-1],
+        flux: data['flux'][n-1]
     }
-
+    console.log('r: ', r)
+    fetch(`${window.origin}/add`, {
+        method: "POST",
+        credentials: "include",
+        body: JSON.stringify(entry),
+        cache: "no-cache",
+        headers: new Headers({
+            "content-type": "application/json"
+        })
+    })
+    .then(function (response) {
+        if (response.status !== 200) {
+            console.log(`Looks like there was a problem. Status code: ${response.status}`);
+            return;
+        }
+        response.json().then(function (table) {
+            data['ra'][n-1] = table['ra'];
+            data['dec'][n-1] = table['dec'];
+            data['flux'][n-1] = table['flux'];
+            cb_obj.change.emit()
+            console.log('Deu certo')
+        });
+    })
+    .catch(function (error) {
+        console.log("Fetch error: " + error);
+    });
 }
 
 function contrast_onchange(cb_obj, source, im) {
@@ -163,9 +165,13 @@ function send_astrometry(cb_obj, key, source) {
     }
 }
 
-function f(cb_obj) {
+function f(cb_obj,radio,source,r) {
     console.log('Executado');
     cb_obj.label = 'Apertado';
-    cb_obj.active = false; // Se ativer o botão executa duas vezes no onclik
+    // cb_obj.active = false; // Se ativer o botão executa duas vezes no onclik
     cb_obj.change.emit();
+
+    console.log('radio', radio);
+    console.log('source', source);
+    console.log('circulo', r);
 }

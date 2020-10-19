@@ -2,7 +2,7 @@ from bokeh.plotting import figure
 from bokeh.embed import components
 from bokeh.events import Tap
 from bokeh.models import ColumnDataSource, DataTable, TableColumn, PointDrawTool, Spinner, WheelZoomTool, RadioGroup,\
-    CustomJS, Paragraph, Button, Slider, TextInput, Toggle
+    CustomJS, Paragraph, Button, Slider, TextInput, Toggle, Div
 from bokeh.layouts import column, row
 
 import colorcet as cc
@@ -17,9 +17,11 @@ from astropy.io import fits
 from astropy.visualization import HistEqStretch, ContrastBiasStretch
 from astropy.table import Table
 from astropy.coordinates import SkyCoord, match_coordinates_3d
+from astropy.wcs import WCS
 from astroquery.astrometry_net import AstrometryNet
 from astroquery.exceptions import TimeoutError
-from astropy.wcs import WCS
+
+from photutils import CircularAperture, aperture_photometry
 
 import pandas as pd
 
@@ -145,6 +147,7 @@ def plotfits(filename):
         dec=[],
         x=[],
         y=[],
+        flux = [],
         tipo=[], # se é obj, src ou sky
         banda=[] # o filtro da imagem
     ))
@@ -181,6 +184,7 @@ def plotfits(filename):
         TableColumn(field='y',title='y'),
         TableColumn(field='ra',title='ra'),
         TableColumn(field='dec',title='dec'),
+        TableColumn(field='flux',title='flux'),
         TableColumn(field='tipo',title='tipo')
     ], editable=True)
     
@@ -202,6 +206,8 @@ def plotfits(filename):
     p.add_tools(tool)
     p.toolbar.active_tap = tool
 
+    div_text = Div(text='Aqui vou escrever algumas instruções ou terá mais ferramentas', width=200)
+
     # Muda o raio da abertura fotométrica
     spinner = Spinner(title="Raio", low=1, high=40, step=0.5, value=8, width=80)
     spinner.js_link('value', c.glyph, 'radius')
@@ -212,8 +218,8 @@ def plotfits(filename):
     radio_group = RadioGroup(labels=LABELS, active=0)
 
     # Evento de mudança da tabela de dados, para inserir dados padrão nas colunas inalteradas
-    source.js_on_change('data', CustomJS(args=dict(radio=radio_group,add=celestial), code='''
-    source_onchange(cb_obj, radio, add)
+    source.js_on_change('data', CustomJS(args=dict(radio=radio_group,r=c.glyph.radius), code='''
+    source_onchange(cb_obj, radio, r);
     '''))
     # Fazer o upload do corr.fit da imagem (defasado)
 
@@ -236,13 +242,14 @@ def plotfits(filename):
     '''))
 
     test = Toggle(label='Teste',button_type='success')
-    test.js_on_click(CustomJS(code='''
-    f(cb_obj);
+    test.js_on_click(CustomJS(args=dict(radio=radio_group,source=source,r=c.glyph.radius), code='''
+    f(cb_obj,radio,source,r);
     '''))
-
+    print('raio: ',c.glyph.radius)
     div, script = components(row(column(spinner,contrast,radio_title,radio_group,
                                         salvar,apikey_input,send_astrometry,test),
-                                 column(p,tabela, sizing_mode='scale_width')))
+                                 column(p,tabela, sizing_mode='scale_width'),
+                                 column(div_text)))
     return render_template('plot.html', the_div=div, the_script=script)
 
 
@@ -252,12 +259,21 @@ def add_radec():
     req = request.get_json()
     w = WCS(fits.getheader(UPLOAD_FOLDER+'/'+req['name']))
 
-    ra, dec = w.wcs_pix2world([(req['x'],req['y'])],0)[0]
+    # Pega as coordenadas celestes se houver correção
+    if w.has_celestial:
+        ra, dec = w.wcs_pix2world([(req['x'],req['y'])],0)[0]
+        req['ra'] = ra
+        req['dec'] =    dec
+    print(req)
+    # Faz a fotometria de abertura
+    with fits.open(UPLOAD_FOLDER+'/'+req['name']) as f:
+        img = f[0].data
+    r = req['r']
+    aperture = CircularAperture((req['x'],req['y']), r)
+    fluxes = aperture_photometry(img,aperture)
+    req['flux'] = fluxes['aperture_sum'][0]
 
-    res = make_response(jsonify(dict(
-        ra = ra,
-        dec = dec
-    )),200)
+    res = make_response(jsonify(req), 200)
 
     return res
 
@@ -304,6 +320,7 @@ def astrometrysolve(key,filename):
         req = request.get_json()
         data = pd.DataFrame(req)
         sdata = data[data['tipo']=='src']
+        filepath = UPLOAD_FOLDER+'/'+filename
 
         # Primeira tentativa apenas com a lista de estrelas
         if len(data):
@@ -311,16 +328,16 @@ def astrometrysolve(key,filename):
             wcs_header = solveplateastrometry(key,sdata[['x','y','fit']])
         else:
             print('Tentando com a imagem do photutils')
-            wcs_header = solveplateastrometry(key,filename)
+            wcs_header = solveplateastrometry(key,filepath)
         print('Resultado 1\n', wcs_header)
 
         if not isinstance(wcs_header,fits.Header):
             print('Tentando com upload da imagem')
-            wcs_header = solveplateastrometry(key,filename,force_upload=True)
+            wcs_header = solveplateastrometry(key,filepath,force_upload=True)
             print('Resultado 2\n', wcs_header)
 
         if isinstance(wcs_header,fits.Header):
-            with fits.open('upfolder/'+filename,'update') as f:
+            with fits.open(filepath,'update') as f:
                 f[0].header = f[0].header+wcs_header
             
             return make_response({'message': 'OK'}, 200)
