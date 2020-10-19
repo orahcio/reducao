@@ -165,15 +165,8 @@ def plotfits(filename):
         corname = 'upfolder/'+filename.strip('[.fit|.fits]')+'.xlsx'
         cordata = pd.read_excel(corname)
         # Dados que serão usados para fazer computação e visualizar os pontos
-        source = ColumnDataSource(dict(
-            fit=[filename for i in range(len(cordata))], # quando salvar estado salvar tabela
-            ra=['na' for i in range(len(cordata))],
-            dec=['na' for i in range(len(cordata))],
-            x=cordata['x'].tolist(),
-            y=cordata['y'].tolist(),
-            tipo=cordata['tipo'], # se é obj, src ou sky
-            banda=['undef' for i in range(len(cordata))] # o filtro da imagem
-        ))
+        source = ColumnDataSource(cordata)
+
         print('Coordenadas carregadas.')
     except FileNotFoundError:
         print('Não há coordenadas salvas: %s' % corname)
@@ -220,123 +213,18 @@ def plotfits(filename):
 
     # Evento de mudança da tabela de dados, para inserir dados padrão nas colunas inalteradas
     source.js_on_change('data', CustomJS(args=dict(radio=radio_group,add=celestial), code='''
-    var data = cb_obj.data;
-
-    console.log(add)
-
-    const n = data['x'].length;
-    const labels = radio.labels;
-    var aux = `${window.location.pathname}`;
-    aux = aux.slice(6,aux.length);
-    if(data['tipo'][n-1]=='na') {
-        data['fit'][n-1] = aux;
-        data['tipo'][n-1] = labels[radio.active];
-        data['banda'][n-1] = 'undef';
-    }
-
-    if(add) {
-        entry = {
-            name: aux,
-            x: data['x'][n-1],
-            y: data['y'][n-1]
-        }
-
-        fetch(`${window.origin}/add`, {
-            method: "POST",
-            credentials: "include",
-            body: JSON.stringify(entry),
-            cache: "no-cache",
-            headers: new Headers({
-                "content-type": "application/json"
-            })
-        })
-        .then(function (response) {
-            if (response.status !== 200) {
-                console.log(`Looks like there was a problem. Status code: ${response.status}`);
-                return;
-            }
-            response.json().then(function (table) {
-                data['ra'][n-1] = table['ra']);
-                data['dec'][n-1] = table['dec']
-            });
-        })
-        .catch(function (error) {
-            console.log("Fetch error: " + error);
-        });
-    }
-
-    cb_obj.change.emit();
+    source_onchange(cb_obj, radio, add)
     '''))
     # Fazer o upload do corr.fit da imagem (defasado)
 
     contrast = Slider(start=-1, end=6, value=1, step=0.05, title="Contraste")
     contrast.js_on_change('value',CustomJS(args = dict(source=im.data_source, im=nimg), code = '''
-
-    const x = im
-    var y = source.data['image'][0];
-    // console.log(y)
-    const ni = y.length
-    const nj = y[0].length
-    const n = ni*nj
-    var c = cb_obj.value
-    // console.log(c)
-    var max = 0 
-    var min = 2**64-1
-
-    // console.log('x: ', x) 
-    // Clip values
-    const clip = (y) => {
-        for(let i=0;i<ni;i++) {
-            for(let j=0;j<nj;j++) {
-                if(max<y[i][j]) { max=y[i][j] }
-                if(min>y[i][j]) { min=y[i][j] }
-            }
-        }
-        for(let i=0;i<ni;i++) {
-            for(let j=0;j<nj;j++) {
-                y[i][j] = (y[i][j]-min)/(max-min)
-            }
-        }
-        return y
-    }
-    y = clip(y)
-    for(let i=0;i<ni;i++) {
-        for(let j=0;j<nj;j++) {
-            y[i][j] = Math.pow(x[i][j]+1e-8,10**c)
-        }
-    }
-    y = clip(y)
-    source.change.emit()
+    contrast_onchange(cb_obj,source,im)
     '''))
 
     # o Botão de salvar irá enviar um json para o servidor que irá ler e fazer os procedimentos posteriores
     callback_botao = CustomJS(args=dict(source=source), code='''
-
-    var entry = source.data;
-    console.log(entry)
-
-    fetch(`${window.origin}/resultado`, {
-        method: "POST",
-        credentials: "include",
-        body: JSON.stringify(entry),
-        cache: "no-cache",
-        headers: new Headers({
-            "content-type": "application/json"
-        })
-    })
-    .then(function (response) {
-        if (response.status !== 200) {
-            console.log(`Looks like there was a problem. Status code: ${response.status}`);
-            return;
-        }
-        response.json().then(function (data) {
-            console.log('Acabaou de chegar: ',data['x']);
-        });
-    })
-    .catch(function (error) {
-        console.log("Fetch error: " + error);
-    });
-
+    salvar_onclick(source);
     ''')
     salvar = Button(label='Salvar tabela', button_type="success")
     salvar.js_on_click(callback_botao)
@@ -361,7 +249,17 @@ def plotfits(filename):
 @app.route('/add', methods=['POST'])
 def add_radec():
 
-    return 'Oi'
+    req = request.get_json()
+    w = WCS(fits.getheader(UPLOAD_FOLDER+'/'+req['name']))
+
+    ra, dec = w.wcs_pix2world([(req['x'],req['y'])],0)[0]
+
+    res = make_response(jsonify(dict(
+        ra = ra,
+        dec = dec
+    )),200)
+
+    return res
 
 
 def solveplateastrometry(key,data,force_upload=False):
