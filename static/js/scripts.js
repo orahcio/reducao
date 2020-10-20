@@ -1,4 +1,47 @@
 
+function radius_onchange(cb_obj,source) {
+
+    let data = source.data
+    const n = data['x'].length
+    let aux = `${window.location.pathname}`;
+    aux = aux.slice(6,aux.length);
+    
+    let entry = {
+        name: aux,
+        r: cb_obj.value,
+        x: data['x'],
+        y: data['y'],
+        flux: data['flux']
+    }
+
+    fetch(`${window.origin}/fluxes`, {
+        method: "POST",
+        credentials: "include",
+        body: JSON.stringify(entry),
+        cache: "no-cache",
+        headers: new Headers({
+            "content-type": "application/json"
+        })
+    })
+    .then(function (response) {
+        if (response.status !== 200) {
+            console.log(`Looks like there was a problem. Status code: ${response.status}`);
+            return;
+        }
+        response.json().then(function (table) {
+            for(let i=0; i<n; i++) {
+                data['flux'][i] = table['flux'][i];
+            }
+            source.change.emit()
+            console.log('Deu certo')
+        });
+    })
+    .catch(function (error) {
+        console.log("Fetch error: " + error);
+    });
+
+}
+
 function source_onchange(cb_obj, radio, r) {
     var data = cb_obj.data;
 

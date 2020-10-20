@@ -211,6 +211,9 @@ def plotfits(filename):
     # Muda o raio da abertura fotométrica
     spinner = Spinner(title="Raio", low=1, high=40, step=0.5, value=8, width=80)
     spinner.js_link('value', c.glyph, 'radius')
+    spinner.js_on_change('value', CustomJS(args=dict(source=source), code='''
+    radius_onchange(cb_obj,source);
+    '''))
 
     # Selecionar o tipo de fonte luminosa: obj, src ou sky
     radio_title = Paragraph(text='Escolha o tipo:')
@@ -251,6 +254,28 @@ def plotfits(filename):
                                  column(p,tabela, sizing_mode='scale_width'),
                                  column(div_text)))
     return render_template('plot.html', the_div=div, the_script=script)
+
+
+@app.route('/fluxes', methods=['POST'])
+def recalc_fluxes():
+
+    req = request.get_json()
+    data = pd.DataFrame(dict(
+        x=req['x'],
+        y=req['y'],
+        flux=req['flux']
+    ))
+
+    with fits.open(UPLOAD_FOLDER+'/'+req['name']) as f:
+        img = f[0].data
+    r = req['r']
+    aperture = CircularAperture(data[['x','y']], r)
+    fluxes = aperture_photometry(img,aperture)
+    data['flux'] = fluxes['aperture_sum']
+
+    res = make_response(data.to_json(),200)
+
+    return res
 
 
 @app.route('/add', methods=['POST'])
