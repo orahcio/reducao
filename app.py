@@ -16,10 +16,11 @@ import os
 from astropy.io import fits
 from astropy.visualization import HistEqStretch, ContrastBiasStretch
 from astropy.table import Table
-from astropy.coordinates import SkyCoord, match_coordinates_3d
+from astropy.coordinates import SkyCoord, match_coordinates_sky
 from astropy.wcs import WCS
 from astroquery.astrometry_net import AstrometryNet
 from astroquery.exceptions import TimeoutError
+from astroquery.irsa import Irsa
 
 from photutils import CircularAperture, aperture_photometry
 
@@ -59,56 +60,8 @@ def interface():
     return render_template("interface.html")
 
 
-@app.route('/corfit', methods=['POST'])
-def upload_cor():
-    '''
-    Essa função ficou defasada quando decidi upar o corr junto com o fit
-    Posteriormente farei a requisição diretamente ao astrometry.net para
-    não ter mais trabalho de upar lá pra depois aqui
-    '''
-
-    req = request.get_json()
-    
-    # decodificando a string recebida
-    decoded = base64.b64decode(req['arquivo'])
-
-    # fazendo upload atualizando o nome do arquivo para upload
-    filename = UPLOAD_FOLDER+'/'+req['url'].split('/')[-1].strip(FITs)+'.corr'
-    with open(filename, 'wb') as f:
-        f.write(decoded)
-
-    # pegando a tabela com as coordenadas de estrelas selecionadas
-    data = pd.DataFrame(dict(
-        ra=req['ra'],
-        dec=req['dec'],
-        x=req['x'],
-        y=req['y'],
-        tipo = req['tipo']
-        ))
-    data = data[data['tipo']=='src']
-
-    # tabela com os dados que acabaram de ser subidos
-    cordata = Table.read(filename).to_pandas()
-
-    # fazendo correspondência entre coordenadas
-    if len(data)>0:
-        m = SkyCoord([(x,y,0) for x,y in data[['x','y']]], unit='pixel', representation='cartesian')
-        c = SkyCoord([(x,y,0) for x,y in cordata[['x','y']]], unit='pixel', representation='cartesian')
-        idx, _, _ = match_coordinates_3d(m,c)
-        cordata = cordata[idx]
-
-        # atualisando os dados para as coordenadas do arquivo corr
-        data['x'] = cordata['field_x']
-        data['y'] = cordata['field_y']
-        data['ra'] = cordata['field_ra']
-        data['dec'] = cordata['field_dec']
-
-        return make_response(data.to_json())
-
-    data = cordata[['field_ra','field_dec','field_x','field_y']]
-    data.columns = ['ra','dec','x','y']
-    
-    return make_response(data.to_json(),200)
+# Caso precise transportar uma asrquivo no json abre ele com base64.b64decode(req['arquivo'])
+# salva o arquivo unsado 'wb' 
 
 
 @app.route('/', methods=['GET', 'POST'])
@@ -148,6 +101,8 @@ def plotfits(filename):
         x=[],
         y=[],
         flux = [],
+        j = [],
+        k = [],
         tipo=[], # se é obj, src ou sky
         banda=[] # o filtro da imagem
     ))
@@ -205,6 +160,7 @@ def plotfits(filename):
     tool = PointDrawTool(renderers=[c,cd],empty_value='na')
     p.add_tools(tool)
     p.toolbar.active_tap = tool
+    p.toolbar.active_inspect = None
 
     div_text = Div(text='Aqui vou escrever algumas instruções ou terá mais ferramentas', width=200)
 
@@ -244,6 +200,11 @@ def plotfits(filename):
     send_astrometry(cb_obj,key,source);
     '''))
 
+    busca_2mass = Button(label='2MASS',button_type='success')
+    busca_2mass.js_on_click(CustomJS(args=dict(source=source), code='''
+    send_2mass(source)
+    '''))
+
     test = Toggle(label='Teste',button_type='success')
     test.js_on_click(CustomJS(args=dict(radio=radio_group,source=source,r=c.glyph.radius), code='''
     f(cb_obj,radio,source,r);
@@ -252,7 +213,7 @@ def plotfits(filename):
     div, script = components(row(column(spinner,contrast,radio_title,radio_group,
                                         salvar,apikey_input,send_astrometry,test),
                                  column(p,tabela, sizing_mode='scale_width'),
-                                 column(div_text)))
+                                 column(div_text, busca_2mass)))
     return render_template('plot.html', the_div=div, the_script=script)
 
 
@@ -260,6 +221,7 @@ def plotfits(filename):
 def recalc_fluxes():
 
     req = request.get_json()
+
     data = pd.DataFrame(dict(
         x=req['x'],
         y=req['y'],
@@ -269,6 +231,7 @@ def recalc_fluxes():
     with fits.open(UPLOAD_FOLDER+'/'+req['name']) as f:
         img = f[0].data
     r = req['r']
+
     aperture = CircularAperture(data[['x','y']], r)
     fluxes = aperture_photometry(img,aperture)
     data['flux'] = fluxes['aperture_sum']
@@ -288,8 +251,8 @@ def add_radec():
     if w.has_celestial:
         ra, dec = w.wcs_pix2world([(req['x'],req['y'])],0)[0]
         req['ra'] = ra
-        req['dec'] =    dec
-    print(req)
+        req['dec'] = dec
+    
     # Faz a fotometria de abertura
     with fits.open(UPLOAD_FOLDER+'/'+req['name']) as f:
         img = f[0].data
@@ -386,7 +349,33 @@ def create_entry():
     res = make_response(jsonify({"message": "Arquivo salvo"}), 200)
     # res = make_response(req, 200)
 
+    # uploaded_file('upfolder/'+out['fit'][0].strip(FITs)+'.xlsx')
+
     return res
+
+@app.route("/busca",methods=['POST'])
+def search_2MASS():
+    '''
+    Faz busca no catálogo 2MASS a partir das coordenadas celestes
+    '''
+
+    req = request.get_json()
+
+    data = pd.DataFrame(req)
+    data = data[data['tipo']=='src'] # pega apenas as estrelas
+
+    src = SkyCoord(ra=data['ra'], dec=data['dec'], unit=('deg','deg'), frame='icrs')
+    crval = SkyCoord(ra=np.mean(data['ra']), dec=np.mean(data['dec']), unit=('deg','deg'), frame='icrs')
+    r = max(SkyCoord.separation(src,crval))
+
+    Q = Irsa.query_region(crval,catalog='fp_psc',radius=1.2*r,selcols=['ra','dec','j_m','k_m'])
+
+    m = SkyCoord(ra=Q['ra'],dec=Q['dec'], unit=('deg','deg'), frame='icrs')
+    idx, _, _ = match_coordinates_sky(src,m)
+
+    data[['j','k']] = Q[['j_m','k_m']][idx].to_pandas()
+
+    return make_response(data.to_json(),200)
 
 
 @app.route('/download/<filename>')
@@ -396,4 +385,4 @@ def uploaded_file(filename):
 
 
 if __name__ == "__main__":
-    app.run(debug=True)
+   app.run(debug=True)

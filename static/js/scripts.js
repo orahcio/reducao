@@ -9,11 +9,11 @@ function radius_onchange(cb_obj,source) {
     let entry = {
         name: aux,
         r: cb_obj.value,
-        x: data['x'],
-        y: data['y'],
-        flux: data['flux']
+        x: [].slice.call(data['x']), // converte os valores pra um array normal
+        y: [].slice.call(data['y']),
+        flux: [].slice.call(data['flux'])
     }
-
+    console.log(entry)
     fetch(`${window.origin}/fluxes`, {
         method: "POST",
         credentials: "include",
@@ -42,13 +42,20 @@ function radius_onchange(cb_obj,source) {
 
 }
 
+
+const get_name = () => {
+    let aux = `${window.location.pathname}`;
+    aux = aux.slice(6,aux.length);
+
+    return aux;
+}
+
+
 function source_onchange(cb_obj, radio, r) {
     var data = cb_obj.data;
 
     const n = data['x'].length;
     const labels = radio.labels;
-    var aux = `${window.location.pathname}`;
-    aux = aux.slice(6,aux.length);
     if(data['tipo'][n-1]=='na') {
         data['fit'][n-1] = aux;
         data['tipo'][n-1] = labels[radio.active];
@@ -57,7 +64,7 @@ function source_onchange(cb_obj, radio, r) {
     cb_obj.change.emit();
 
     entry = {
-        name: aux,
+        name: get_name(),
         r: r,
         x: data['x'][n-1],
         y: data['y'][n-1],
@@ -131,8 +138,26 @@ function contrast_onchange(cb_obj, source, im) {
     source.change.emit()
 }
 
+
+const make_entry = (data) => {
+    return {
+        banda: data['banda'],
+        tipo: data['tipo'],
+        fit: data['fit'],
+        x: [].slice.call(data['x']),
+        y: [].slice.call(data['y']),
+        ra: [].slice.call(data['ra']),
+        dec: [].slice.call(data['dec']),
+        flux: [].slice.call(data['flux']),
+        j: [].slice.call(data['j']),
+        k: [].slice.call(data['k'])
+    };
+}
+
+
 function salvar_onclick(source) {
-    var entry = source.data;
+    var data = source.data;
+    var entry = make_entry(data);
     console.log(entry)
 
     fetch(`${window.origin}/resultado`, {
@@ -149,14 +174,24 @@ function salvar_onclick(source) {
             console.log(`Looks like there was a problem. Status code: ${response.status}`);
             return;
         }
-        response.json().then(function (data) {
+        response.json().then(function (res) {
             // Mudara essa resposta aqui
-            console.log('Acabaou de chegar: ',data['x']);
+            console.log('Acabaou de chegar: ',res);
         });
     })
     .catch(function (error) {
         console.log("Fetch error: " + error);
     });
+
+    // Fazer download
+    url = `${window.origin}/download/${get_name().replace(/(fits|fit)/,'xlsx')}`
+    // fetch(url)
+    console.log(url)
+    var link = document.createElement("a");
+    link.download = get_name().replace(/(fits|fit)/,'xlsx');
+    link.href = url;
+    link.click();
+
 }
 
 function send_astrometry(cb_obj, key, source) {
@@ -207,6 +242,46 @@ function send_astrometry(cb_obj, key, source) {
         });
     }
 }
+
+
+function send_2mass(source) {
+    var data = source.data;
+    const n = data['x'].length
+    entry = {
+        tipo: data['tipo'],
+        ra: [].slice.call(data['ra']),
+        dec: [].slice.call(data['dec'])
+    }
+
+    fetch(`${window.origin}/busca`, {
+        method: "POST",
+        credentials: "include",
+        body: JSON.stringify(entry),
+        cache: "no-cache",
+        headers: new Headers({
+            "content-type": "application/json"
+        })
+    })
+    .then(function (response) {
+        if (response.status !== 200) {
+            console.log(`Looks like there was a problem. Status code: ${response.status}`);
+            return;
+        }
+        response.json().then(function (table) {
+            // Mudara essa resposta aqui
+            for(let i=0; i<n; i++) {
+                data['j'][i] = table['j'][i]
+                data['k'][i] = table['k'][i]
+            }
+            console.log('ok')
+        });
+    })
+    .catch(function (error) {
+        console.log("Fetch error: " + error);
+    });
+
+}
+
 
 function f(cb_obj,radio,source,r) {
     console.log('Executado');
