@@ -1,17 +1,19 @@
 <!DOCTYPE html>
 <html>
   <head>
-    <title>File input with Bokeh</title>
-    <link href="http://cdn.pydata.org/bokeh/release/bokeh-2.2.1.min.css" rel="stylesheet">
-    <link href="http://cdn.pydata.org/bokeh/release/bokeh-widgets-2.2.1.min.css" rel="stylesheet">
+    <title>Redução de dados astrométricos</title>
+    <link href="http://cdn.pydata.org/bokeh/release/bokeh-2.2.2.min.css" rel="stylesheet">
+    <link href="http://cdn.pydata.org/bokeh/release/bokeh-widgets-2.2.2.min.css" rel="stylesheet">
+    <link rel="shortcut icon" href="{{ url_for('static', filename='favicon.ico') }}">
+
+    <meta property="og:image" content="{{ url_for('static', filename='icons/BlackWomanFistUp.jpg') }}">
+
   </head>
   <body>
     <h1>Inicia a redução fazendo o upload da imagem</h1>
     <form method="POST" action="" enctype="multipart/form-data">
       <p>Escolha um arquivo .fits ou .fit<br>
         <input type="file" name="fits"></p>
-      <p>Escolha o arquivo .corr obtido do astrometry.net<br>
-        <input type="file" name="corr"></p>
       <p><input type="submit" value="Iniciar"></p>
     </form>
     <!-- {{ the_div|safe }} -->

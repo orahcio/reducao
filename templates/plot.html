@@ -2,16 +2,20 @@
 <html>
   <head>
     <title>File input with Bokeh</title>
-    <link href="http://cdn.pydata.org/bokeh/release/bokeh-2.2.1.min.css" rel="stylesheet">
-    <link href="http://cdn.pydata.org/bokeh/release/bokeh-widgets-2.2.1.min.css" rel="stylesheet">
+    <link href="http://cdn.pydata.org/bokeh/release/bokeh-2.2.2.min.css" rel="stylesheet">
+    <link href="http://cdn.pydata.org/bokeh/release/bokeh-widgets-2.2.2.min.css" rel="stylesheet">
+    <link rel="shortcut icon" href="{{ url_for('static', filename='favicon.ico') }}">
+
+    <meta property="og:image" content="{{ url_for('static', filename='icons/BlackWomanFistUp.jpg') }}">
+
   </head>
   <body>
     <h2>Clique na imagem para selecionar a centróide do objeto (obj), estrela (src) ou céu (sky).</h2>
     {{ the_div|safe }}
     <script type=text/javascript src="{{ url_for('static', filename='js/scripts.js') }}"></script>
-    <script src="https://cdn.bokeh.org/bokeh/release/bokeh-2.2.1.min.js" crossorigin="anonymous"></script>
-    <script src="https://cdn.bokeh.org/bokeh/release/bokeh-widgets-2.2.1.min.js" crossorigin="anonymous"></script>
-    <script src="https://cdn.bokeh.org/bokeh/release/bokeh-tables-2.2.1.min.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.bokeh.org/bokeh/release/bokeh-2.2.2.min.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.bokeh.org/bokeh/release/bokeh-widgets-2.2.2.min.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.bokeh.org/bokeh/release/bokeh-tables-2.2.2.min.js" crossorigin="anonymous"></script>
     {{ the_script|safe }}
   </body>
 </html>

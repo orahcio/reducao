@@ -162,8 +162,7 @@ def plotfits(filename):
     p.toolbar.active_tap = tool
     p.toolbar.active_inspect = None
 
-    div_text = Div(text='Aqui vou escrever algumas instruções ou terá mais ferramentas', width=200)
-
+    # Coluna de controles de interação
     # Muda o raio da abertura fotométrica
     spinner = Spinner(title="Raio", low=1, high=40, step=0.5, value=8, width=80)
     spinner.js_link('value', c.glyph, 'radius')
@@ -187,33 +186,38 @@ def plotfits(filename):
     contrast_onchange(cb_obj,source,im)
     '''))
 
-    # o Botão de salvar irá enviar um json para o servidor que irá ler e fazer os procedimentos posteriores
-    callback_botao = CustomJS(args=dict(source=source), code='''
-    salvar_onclick(source);
-    ''')
-    salvar = Button(label='Salvar tabela', button_type="success")
-    salvar.js_on_click(callback_botao)
-
+    # Coluna de requisição
+    text1 = Div(text='<b>Instruções:</b><p>1. Digite a chave do Astrometry.net')
     apikey_input = TextInput(title='Apikey do Astrometry.net', placeholder='digite a chave aqui')
+
+    text2 = Div(text='2. Clique abaixo pra requisitar a correção WCS')
     send_astrometry = Toggle(label='Solução de placa do astrometry.net', disabled=celestial)
     send_astrometry.js_on_click(CustomJS(args=dict(key=apikey_input, source=source), code='''
     send_astrometry(cb_obj,key,source);
     '''))
 
+    text3 = Div(text='3. Após escolher as fontes no gráfico e ajustar o raio, clique abaixo pra requisitar as magnitudes j e k')
     busca_2mass = Button(label='2MASS',button_type='success')
     busca_2mass.js_on_click(CustomJS(args=dict(source=source), code='''
     send_2mass(source)
     '''))
 
-    test = Toggle(label='Teste',button_type='success')
+    text4 = Div(text='4. Salve a tabela de dados clicando abaixo para download')
+    # o Botão de salvar irá enviar um json para o servidor que irá ler e fazer os procedimentos posteriores
+    salvar = Button(label='Salvar tabela', button_type="success")
+    salvar.js_on_click(CustomJS(args=dict(source=source), code='''
+    salvar_onclick(source);
+    '''))
+
+    test = Button(label='Teste',button_type='success')
     test.js_on_click(CustomJS(args=dict(radio=radio_group,source=source,r=c.glyph.radius), code='''
     f(cb_obj,radio,source,r);
     '''))
     print('raio: ',c.glyph.radius)
     div, script = components(row(column(spinner,contrast,radio_title,radio_group,
-                                        salvar,apikey_input,send_astrometry,test),
+                                        test),
                                  column(p,tabela, sizing_mode='scale_width'),
-                                 column(div_text, busca_2mass)))
+                                 column(text1,apikey_input,text2,send_astrometry,text3,busca_2mass,text4,salvar)))
     return render_template('plot.html', the_div=div, the_script=script)
 
 
