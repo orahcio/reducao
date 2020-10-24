@@ -8,7 +8,7 @@ from bokeh.layouts import column, row
 import colorcet as cc
 
 from flask import Flask, flash, render_template, request, redirect, url_for
-from flask import send_from_directory, jsonify, make_response 
+from flask import send_from_directory, jsonify, make_response
 import json
 from werkzeug.utils import secure_filename
 import os
@@ -388,5 +388,9 @@ def uploaded_file(filename):
                                filename)
 
 
+def main():
+    port = int(os.environ.get("PORT",5000))
+    app.run(host="0.0.0.0", port=port)
+
 if __name__ == "__main__":
-   app.run()
+   main()
