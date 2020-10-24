@@ -57,7 +57,7 @@ function source_onchange(cb_obj, radio, r) {
     const n = data['x'].length;
     const labels = radio.labels;
     if(data['tipo'][n-1]=='na') {
-        data['fit'][n-1] = aux;
+        data['fit'][n-1] = get_name();
         data['tipo'][n-1] = labels[radio.active];
         data['banda'][n-1] = 'undef';
     }
