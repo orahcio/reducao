@@ -67,7 +67,7 @@ pyparsing==2.4.7
 pyrsistent==0.17.3
 python-dateutil==2.8.1
 pytz==2020.1
-pyvo==1.1
+-e git+https://github.com/astropy/pyvo.git@cfbd8f6a24d83f0ae9b0b6a61c30c66bf5d09d7e#egg=pyvo
 PyYAML==5.3.1
 pyzmq==19.0.2
 requests==2.24.0
