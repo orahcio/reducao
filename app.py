@@ -366,7 +366,6 @@ def search_2MASS():
     req = request.get_json()
 
     data = pd.DataFrame(req)
-    data = data[data['tipo']=='src'] # pega apenas as estrelas
 
     src = SkyCoord(ra=data['ra'], dec=data['dec'], unit=('deg','deg'), frame='icrs')
     crval = SkyCoord(ra=np.mean(data['ra']), dec=np.mean(data['dec']), unit=('deg','deg'), frame='icrs')
@@ -390,8 +389,8 @@ def uploaded_file(filename):
 
 def main():
     port = int(os.environ.get("PORT",5000))
-    app.run(host="0.0.0.0", port=port)
-    # app.run(debug=True)
+    # app.run(host="0.0.0.0", port=port)
+    app.run(debug=True)
 
 if __name__ == "__main__":
    main()
