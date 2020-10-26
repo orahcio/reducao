@@ -1,6 +1,5 @@
 from bokeh.plotting import figure
 from bokeh.embed import components
-from bokeh.events import Tap
 from bokeh.models import ColumnDataSource, DataTable, TableColumn, PointDrawTool, Spinner, WheelZoomTool, RadioGroup,\
     CustomJS, Paragraph, Button, Slider, TextInput, Toggle, Div
 from bokeh.layouts import column, row
@@ -209,15 +208,21 @@ def plotfits(filename):
     salvar_onclick(source);
     '''))
 
+    reset = Button(label='Limpar', button_type='success')
+    reset.js_on_click(CustomJS(args=dict(source=source), code='''
+    reset_onclick(source);
+    '''))
+
     test = Button(label='Teste',button_type='success')
     test.js_on_click(CustomJS(args=dict(radio=radio_group,source=source,r=c.glyph.radius), code='''
     f(cb_obj,radio,source,r);
     '''))
     print('raio: ',c.glyph.radius)
     div, script = components(row(column(spinner,contrast,radio_title,radio_group,
-                                        test),
+                                        reset,test),
                                  column(p,tabela, sizing_mode='scale_width'),
-                                 column(text1,apikey_input,text2,send_astrometry,text3,busca_2mass,text4,salvar)))
+                                 column(text1,apikey_input,text2,send_astrometry,\
+                                     text3,busca_2mass,text4,salvar)))
     return render_template('plot.html', the_div=div, the_script=script)
 
 
@@ -238,7 +243,7 @@ def recalc_fluxes():
 
     aperture = CircularAperture(data[['x','y']], r)
     fluxes = aperture_photometry(img,aperture)
-    data['flux'] = fluxes['aperture_sum']
+    data['flux'] = fluxes['aperture_sum'].to_pandas()
 
     res = make_response(data.to_json(),200)
 
@@ -345,10 +350,21 @@ def create_entry():
     '''
 
     req = request.get_json()
+    out = pd.DataFrame(dict(
+        banda = req['banda'],
+        tipo = req['tipo'],
+        fit = req['fit'],
+        x = req['x'],
+        y = req['y'],
+        ra = req['ra'],
+        dec = req['dec'],
+        flux = req['flux'],
+        j = req['j'],
+        k = req['k']
+    ))
+    print(out)
 
-    out = pd.DataFrame(req)
-    out.to_excel('upfolder/'+out['fit'][0].strip(FITs)+'.xlsx',
-                 index=False)
+    out.to_excel('upfolder/'+out['fit'][0].strip(FITs)+'.xlsx')
 
     res = make_response(jsonify({"message": "Arquivo salvo"}), 200)
     # res = make_response(req, 200)
@@ -378,7 +394,9 @@ def search_2MASS():
 
     data[['j','k']] = Q[['j_m','k_m']][idx].to_pandas()
 
-    return make_response(data.to_json(),200)
+    res = make_response(data.to_json(), 200)
+
+    return res
 
 
 @app.route('/download/<filename>')

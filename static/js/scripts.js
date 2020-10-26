@@ -270,9 +270,12 @@ function send_2mass(source) {
         response.json().then(function (table) {
             // Mudara essa resposta aqui
             for(let i=0; i<n; i++) {
-                data['j'][i] = table['j'][i]
-                data['k'][i] = table['k'][i]
+                if(data['tipo'][i]=='src') {
+                    data['j'][i] = table['j'][i]
+                    data['k'][i] = table['k'][i]
+                }
             }
+            source.change.emit()
             console.log('ok')
         });
     })
@@ -280,6 +283,24 @@ function send_2mass(source) {
         console.log("Fetch error: " + error);
     });
 
+}
+
+
+function reset_onclick(source) {
+    var data = source.data;
+
+    data['x'] = [];
+    data['y'] = [];
+    data['tipo'] = [];
+    data['fit'] = [];
+    data['banda'] = [];
+    data['ra'] = [];
+    data['dec'] = [];
+    data['flux'] = [];
+    data['j'] = [];
+    data['k'] = [];
+
+    source.change.emit()
 }
 
 
