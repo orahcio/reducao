@@ -7,7 +7,6 @@ function radius_onchange(cb_obj,source) {
     aux = aux.slice(6,aux.length);
     
     let entry = {
-        name: aux,
         r: cb_obj.value,
         x: [].slice.call(data['x']), // converte os valores pra um array normal
         y: [].slice.call(data['y']),
@@ -51,7 +50,7 @@ const get_name = () => {
 }
 
 
-function source_onchange(cb_obj, radio, r) {
+function source_onchange(cb_obj, radio) {
     var data = cb_obj.data;
 
     const n = data['x'].length;
@@ -64,15 +63,15 @@ function source_onchange(cb_obj, radio, r) {
     cb_obj.change.emit();
 
     entry = {
-        name: get_name(),
-        r: r,
+        tipo: data['tipo'][n-1],
         x: data['x'][n-1],
         y: data['y'][n-1],
         ra: data['ra'][n-1],
         dec: data['dec'][n-1],
-        flux: data['flux'][n-1]
+        flux: data['flux'][n-1],
+        j: data['j'][n-1],
+        k: data['k'][n-1]
     }
-    console.log('r: ', r)
     fetch(`${window.origin}/add`, {
         method: "POST",
         credentials: "include",
@@ -90,7 +89,12 @@ function source_onchange(cb_obj, radio, r) {
         response.json().then(function (table) {
             data['ra'][n-1] = table['ra'];
             data['dec'][n-1] = table['dec'];
+            data['x'][n-1] = table['x'];
+            data['y'][n-1] = table['y'];
             data['flux'][n-1] = table['flux'];
+            data['j'][n-1] = table['j'];
+            data['k'][n-1] = table['k'];
+
             cb_obj.change.emit()
             console.log('Deu certo')
         });

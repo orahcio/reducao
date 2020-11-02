@@ -6,8 +6,8 @@ from bokeh.layouts import column, row
 
 import colorcet as cc
 
-from flask import Flask, flash, render_template, request, redirect, url_for
-from flask import send_from_directory, jsonify, make_response
+from flask import Flask, flash, render_template, request, redirect, url_for,\
+                  send_from_directory, jsonify, make_response, session
 import json
 from werkzeug.utils import secure_filename
 import os
@@ -15,12 +15,15 @@ import os
 from astropy.io import fits
 from astropy.visualization import HistEqStretch, ContrastBiasStretch
 from astropy.table import Table
+
 from astropy.coordinates import SkyCoord, match_coordinates_sky
 from astropy.wcs import WCS
 from astroquery.astrometry_net import AstrometryNet
 from astroquery.exceptions import TimeoutError
 from astroquery.irsa import Irsa
 
+from astropy.stats import sigma_clipped_stats
+from photutils import DAOStarFinder
 from photutils import CircularAperture, aperture_photometry
 
 import pandas as pd
@@ -36,6 +39,7 @@ FITs = '[.fit|.fits]'
 
 
 app = Flask(__name__)
+app.secret_key = '43k5jh3kUIh3h45$##ssds'
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 
 
@@ -91,10 +95,26 @@ def upload_file():
 
 @app.route('/plot/<filename>')
 def plotfits(filename):
+
+    # Abrindo e pegando dados da sessao
+    if 'name' not in session:
+        session['name'] = filename
+    elif session.get('name') != filename:
+        session.pop('r', None)
+        session.pop('stats', None)
+        session.modifeid = True
+        session['name'] = filename
+    print('Sessão: ', session['name'])
+
+    if 'r' in session:
+        r = session.get('r')
+    else:
+        r = 8
+        session['r'] = r # 8 é o valor que defini como padrão mínimo
     
     # Dados que serão usados para fazer computação e visualizar os pontos
     source = ColumnDataSource(dict(
-        fit=[], # quando salvar estado salvar tabela
+        fit=[], # a tabela informa qual arquivo aqueles dados se refere
         ra=[],
         dec=[],
         x=[],
@@ -109,14 +129,17 @@ def plotfits(filename):
     # Abrindo imagem
     with fits.open('upfolder/'+filename) as f:
         img = f[0].data
-        # Caso tenha correção não ativa o botão para pedir
         celestial = WCS(f[0].header).has_celestial
-    
+
     # Uma matriz pra fazer testes
     # img = np.array([[0,  1,  2,  3],
                     # [4,  5,  6,  7],
                     # [8,  9, 10, 11]])
     
+    # Faz logo algumas estatísticas da imagem
+    if 'stats' not in session:
+       session['stats'] = sigma_clipped_stats(img, sigma=3.0)
+
     # Abrindo coordenadas se salvas
     try:
         corname = 'upfolder/'+filename.strip('[.fit|.fits]')+'.xlsx'
@@ -139,6 +162,8 @@ def plotfits(filename):
         TableColumn(field='ra',title='ra'),
         TableColumn(field='dec',title='dec'),
         TableColumn(field='flux',title='flux'),
+        TableColumn(field='j',title='j'),
+        TableColumn(field='k',title='k'),
         TableColumn(field='tipo',title='tipo')
     ], editable=True)
     
@@ -154,7 +179,7 @@ def plotfits(filename):
     p.grid.grid_line_width = 0
 
     # Os círculos que serão inseridos
-    c = p.circle('x','y', source=source, color='red', fill_color=None, radius=8, line_width=2)
+    c = p.circle('x','y', source=source, color='red', fill_color=None, radius=r, line_width=2)
     cd = p.circle_dot('x','y', source=source, color='red', size=2)
     tool = PointDrawTool(renderers=[c,cd],empty_value='na')
     p.add_tools(tool)
@@ -163,7 +188,7 @@ def plotfits(filename):
 
     # Coluna de controles de interação
     # Muda o raio da abertura fotométrica
-    spinner = Spinner(title="Raio", low=1, high=40, step=0.5, value=8, width=80)
+    spinner = Spinner(title="Raio", low=1, high=40, step=0.5, value=r, width=80)
     spinner.js_link('value', c.glyph, 'radius')
     spinner.js_on_change('value', CustomJS(args=dict(source=source), code='''
     radius_onchange(cb_obj,source);
@@ -175,8 +200,8 @@ def plotfits(filename):
     radio_group = RadioGroup(labels=LABELS, active=0)
 
     # Evento de mudança da tabela de dados, para inserir dados padrão nas colunas inalteradas
-    source.js_on_change('data', CustomJS(args=dict(radio=radio_group,r=c.glyph.radius), code='''
-    source_onchange(cb_obj, radio, r);
+    source.js_on_change('data', CustomJS(args=dict(radio=radio_group), code='''
+    source_onchange(cb_obj, radio);
     '''))
     # Fazer o upload do corr.fit da imagem (defasado)
 
@@ -223,11 +248,14 @@ def plotfits(filename):
                                  column(p,tabela, sizing_mode='scale_width'),
                                  column(text1,apikey_input,text2,send_astrometry,\
                                      text3,busca_2mass,text4,salvar)))
-    return render_template('plot.html', the_div=div, the_script=script)
+    return render_template('plot.html', the_div=div, the_script=script,filename=session['name'])
 
 
 @app.route('/fluxes', methods=['POST'])
 def recalc_fluxes():
+    '''
+    Nesta função o raio tem que vir pelo javascript pois ele é mudado num widget do bokeh
+    '''
 
     req = request.get_json()
 
@@ -237,42 +265,109 @@ def recalc_fluxes():
         flux=req['flux']
     ))
 
-    with fits.open(UPLOAD_FOLDER+'/'+req['name']) as f:
+    with fits.open(UPLOAD_FOLDER+'/'+session['name']) as f:
         img = f[0].data
     r = req['r']
+    session.modifeid = True
+    session['r'] = r
 
     aperture = CircularAperture(data[['x','y']], r)
     fluxes = aperture_photometry(img,aperture)
-    data['flux'] = fluxes['aperture_sum'].to_pandas()
+    data['flux'] = fluxes['aperture_sum']
 
     res = make_response(data.to_json(),200)
 
     return res
 
 
+def centralizar(img, cx, cy):
+    '''
+    Encontra uma fonte dentro de uma abertura com o raio definido pelo usuário
+    '''
+
+    xmax, ymax = img.shape
+    dmin = np.sqrt(xmax*xmax+ymax*ymax)
+
+    r = session['r']
+    aperture = CircularAperture((cx,cy), r)
+    mask = aperture.to_mask()
+    print(mask)
+    mean, median, std = session['stats']
+    find = DAOStarFinder(fwhm=3, threshold=3*std)
+    cr = find((img-median)*mask.to_image(img.shape))
+    if cr:
+        print(cr)
+        # Pega o índice mais próxima do ponto clicado
+        for i in range(len(cr)):
+            x = cr[i]['xcentroid']
+            y = cr[i]['ycentroid']
+            d = np.sqrt((x-cx)**2+(y-cy)**2)
+            if d<dmin:
+                dmin = d
+                idx = i
+        cx = cr[idx]['xcentroid']
+        cy = cr[idx]['ycentroid']
+
+    return cx,cy
+
+
+def query_2MASS(ra,dec):
+    '''
+    Busca no 2MASS dado um campo com o raio definido pelo usuário
+    '''
+
+    w = WCS(fits.getheader(UPLOAD_FOLDER+'/'+session['name']))
+    r = session['r']
+    o = SkyCoord(w.wcs_pix2world([(0,0)],1), unit='deg')
+    opr = SkyCoord(w.wcs_pix2world([(r,r)],1), unit='deg')
+    rw = o.separation(opr)[0]
+    print('Separação',rw)
+
+    crval = SkyCoord(ra=ra, dec=dec, unit='deg', frame='icrs')
+
+    Q = Irsa.query_region(crval,catalog='fp_psc',spatial='Cone', radius=rw,\
+                           selcols=['ra','dec','j_m','k_m']).to_pandas()
+    print(Q)
+    m = SkyCoord(ra=Q['ra'],dec=Q['dec'], unit=('deg','deg'), frame='icrs')
+    idx, d2, _ = match_coordinates_sky(crval,m)
+
+    j , k = Q.loc[idx][['j_m','k_m']]
+    return j, k
+
+
 @app.route('/add', methods=['POST'])
 def add_radec():
+    '''
+    Ao adicionar uma marca no gráfico:
+
+    1- Regula o centróide se for uma estrela ou objeto
+    2- Calcula as coordenadas celestiais se houver correção astrométrica
+    3- Calcula o fluxo
+    '''
 
     req = request.get_json()
-    w = WCS(fits.getheader(UPLOAD_FOLDER+'/'+req['name']))
 
-    # Pega as coordenadas celestes se houver correção
-    if w.has_celestial:
-        ra, dec = w.wcs_pix2world([(req['x'],req['y'])],0)[0]
-        req['ra'] = ra
-        req['dec'] = dec
-    
-    # Faz a fotometria de abertura
-    with fits.open(UPLOAD_FOLDER+'/'+req['name']) as f:
+    with fits.open(UPLOAD_FOLDER+'/'+session['name']) as f:
         img = f[0].data
-    r = req['r']
-    aperture = CircularAperture((req['x'],req['y']), r)
+
+    # Faz a fotometria de abertura
+    req['x'], req['y'] = centralizar(img,req['x'],req['y'])
+    aperture = CircularAperture((req['x'],req['y']), session['r'])
     fluxes = aperture_photometry(img,aperture)
     req['flux'] = fluxes['aperture_sum'][0]
 
-    res = make_response(jsonify(req), 200)
+    # Pega as coordenadas celestes se houver correção
+    w = WCS(fits.getheader(UPLOAD_FOLDER+'/'+session['name']))
+    if w.has_celestial:
+        ra, dec = w.wcs_pix2world([(req['x'],req['y'])],1)[0]
+        req['ra'] = ra
+        req['dec'] = dec
+        if req['tipo'] == 'src':
+            req['j'], req['k'] = query_2MASS(ra,dec)
+        else:
+            req['j'], req['k'] = 'na','na'
 
-    return res
+    return make_response(jsonify(req), 200)
 
 
 def solveplateastrometry(key,data,force_upload=False):
@@ -312,6 +407,12 @@ def solveplateastrometry(key,data,force_upload=False):
 
 @app.route("/astrometry_net/<key>/<filename>", methods=["POST","GET"])
 def astrometrysolve(key,filename):
+    '''
+    Essa função faz a requisição para o astrometry.net,
+    tem espaço para usar o método get, possivelmente implementarei
+    para fazer forçando o upload se a solução não existir e retornar
+    á página do plot de dados.
+    '''
     if request.method=='POST':
 
         req = request.get_json()
@@ -341,7 +442,6 @@ def astrometrysolve(key,filename):
 
         return make_response(jsonify({'message': 'NO'}),200)
 
-    # return redirect(url_for('plotfits',filename=filename))
 
 @app.route("/resultado", methods=["POST"])
 def create_entry():
@@ -350,50 +450,47 @@ def create_entry():
     '''
 
     req = request.get_json()
-    out = pd.DataFrame(dict(
-        banda = req['banda'],
-        tipo = req['tipo'],
-        fit = req['fit'],
-        x = req['x'],
-        y = req['y'],
-        ra = req['ra'],
-        dec = req['dec'],
-        flux = req['flux'],
-        j = req['j'],
-        k = req['k']
-    ))
-    print(out)
+    out = pd.DataFrame(req)
 
-    out.to_excel('upfolder/'+out['fit'][0].strip(FITs)+'.xlsx')
+    if not out.empty:
+        out.to_excel('upfolder/'+out['fit'][0].strip(FITs)+'.xlsx')
+        res = make_response(jsonify({"message": "Arquivo salvo"}), 200)
 
-    res = make_response(jsonify({"message": "Arquivo salvo"}), 200)
-    # res = make_response(req, 200)
+        return res
+    
+    return make_response(jsonify({'message': 'Tabela vazia'}), 200)
 
-    # uploaded_file('upfolder/'+out['fit'][0].strip(FITs)+'.xlsx')
-
-    return res
 
 @app.route("/busca",methods=['POST'])
 def search_2MASS():
     '''
     Faz busca no catálogo 2MASS a partir das coordenadas celestes
     '''
+    
+    w = WCS(fits.getheader(UPLOAD_FOLDER+'/'+session['name']))
+    r = session['r']
+    o = SkyCoord(w.wcs_pix2world([(0,0)],1), unit='deg')
+    opr = SkyCoord(w.wcs_pix2world([(r,r)],1), unit='deg')
+    rw = o.separation(opr)[0]
+    print('Separação',rw)
 
     req = request.get_json()
 
     data = pd.DataFrame(req)
 
-    src = SkyCoord(ra=data['ra'], dec=data['dec'], unit=('deg','deg'), frame='icrs')
-    crval = SkyCoord(ra=np.mean(data['ra']), dec=np.mean(data['dec']), unit=('deg','deg'), frame='icrs')
-    r = max(SkyCoord.separation(src,crval))
+    src = SkyCoord(ra=data['ra'], dec=data['dec'], unit='deg', frame='icrs')
+    crval = SkyCoord(ra=np.mean(data['ra']), dec=np.mean(data['dec']), unit='deg', frame='icrs')
+    r = 1.1*crval.separation(src).max()
 
-    Q = Irsa.query_region(crval,catalog='fp_psc',radius=1.2*r,selcols=['ra','dec','j_m','k_m'])
-
+    Q = Irsa.query_region(crval,catalog='fp_psc',spatial='Cone', radius=r,selcols=['ra','dec','j_m','k_m']).to_pandas()
+    print(Q)
     m = SkyCoord(ra=Q['ra'],dec=Q['dec'], unit=('deg','deg'), frame='icrs')
-    idx, _, _ = match_coordinates_sky(src,m)
+    idx, d2, _ = match_coordinates_sky(src,m)
 
-    data[['j','k']] = Q[['j_m','k_m']][idx].to_pandas()
+    Q.loc[idx[d2>=rw]] = None # retira estrela que não conseguiu chegar perto
 
+    data[['j','k']] = Q[['j_m','k_m']].loc[idx].values
+    print(data)
     res = make_response(data.to_json(), 200)
 
     return res
@@ -407,8 +504,9 @@ def uploaded_file(filename):
 
 def main():
     port = int(os.environ.get("PORT",5000))
-    # app.run(host="0.0.0.0", port=port)
-    app.run(debug=True)
+    app.run(host="0.0.0.0", port=port)
+    # app.run(debug=True)
+
 
 if __name__ == "__main__":
    main()
