@@ -123,7 +123,8 @@ def plotfits(filename):
         j = [],
         k = [],
         tipo=[], # se é obj, src ou sky
-        banda=[] # o filtro da imagem
+        banda=[], # o filtro da imagem
+        color=[]
     ))
 
     # Abrindo imagem
@@ -179,8 +180,8 @@ def plotfits(filename):
     p.grid.grid_line_width = 0
 
     # Os círculos que serão inseridos
-    c = p.circle('x','y', source=source, color='red', fill_color=None, radius=r, line_width=2)
-    cd = p.circle_dot('x','y', source=source, color='red', size=2)
+    c = p.circle('x','y', source=source, color='color', fill_color=None, radius=r, line_width=2)
+    cd = p.circle_dot('x','y', source=source, color='color', size=2)
     tool = PointDrawTool(renderers=[c,cd],empty_value='na')
     p.add_tools(tool)
     p.toolbar.active_tap = tool
@@ -351,7 +352,8 @@ def add_radec():
         img = f[0].data
 
     # Faz a fotometria de abertura
-    req['x'], req['y'] = centralizar(img,req['x'],req['y'])
+    if not req['tipo'] == 'sky':
+        req['x'], req['y'] = centralizar(img,req['x'],req['y'])
     aperture = CircularAperture((req['x'],req['y']), session['r'])
     fluxes = aperture_photometry(img,aperture)
     req['flux'] = fluxes['aperture_sum'][0]
@@ -503,9 +505,9 @@ def uploaded_file(filename):
 
 
 def main():
-    port = int(os.environ.get("PORT",5000))
-    app.run(host="0.0.0.0", port=port)
-    # app.run(debug=True)
+    # port = int(os.environ.get("PORT",5000))
+    # app.run(host="0.0.0.0", port=port)
+    app.run(debug=True)
 
 
 if __name__ == "__main__":

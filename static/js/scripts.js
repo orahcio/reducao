@@ -49,59 +49,66 @@ const get_name = () => {
     return aux;
 }
 
+const COLORS = ['red','yellow','blue'];
+var N = 0;
 
 function source_onchange(cb_obj, radio) {
     var data = cb_obj.data;
 
     const n = data['x'].length;
-    const labels = radio.labels;
-    if(data['tipo'][n-1]=='na') {
-        data['fit'][n-1] = get_name();
-        data['tipo'][n-1] = labels[radio.active];
-        data['banda'][n-1] = 'undef';
-    }
-    cb_obj.change.emit();
-
-    entry = {
-        tipo: data['tipo'][n-1],
-        x: data['x'][n-1],
-        y: data['y'][n-1],
-        ra: data['ra'][n-1],
-        dec: data['dec'][n-1],
-        flux: data['flux'][n-1],
-        j: data['j'][n-1],
-        k: data['k'][n-1]
-    }
-    fetch(`${window.origin}/add`, {
-        method: "POST",
-        credentials: "include",
-        body: JSON.stringify(entry),
-        cache: "no-cache",
-        headers: new Headers({
-            "content-type": "application/json"
-        })
-    })
-    .then(function (response) {
-        if (response.status !== 200) {
-            console.log(`Looks like there was a problem. Status code: ${response.status}`);
-            return;
+    if(n>N) {
+        const labels = radio.labels;
+        if(data['tipo'][n-1]=='na') {
+            data['fit'][n-1] = get_name();
+            data['tipo'][n-1] = labels[radio.active];
+            data['banda'][n-1] = 'undef';
         }
-        response.json().then(function (table) {
-            data['ra'][n-1] = table['ra'];
-            data['dec'][n-1] = table['dec'];
-            data['x'][n-1] = table['x'];
-            data['y'][n-1] = table['y'];
-            data['flux'][n-1] = table['flux'];
-            data['j'][n-1] = table['j'];
-            data['k'][n-1] = table['k'];
+        data['color'][n-1] = COLORS[radio.active];
+        cb_obj.change.emit();
 
-            cb_obj.change.emit()
-            console.log('Deu certo')
+        entry = {
+            tipo: data['tipo'][n-1],
+            x: data['x'][n-1],
+            y: data['y'][n-1],
+            ra: data['ra'][n-1],
+            dec: data['dec'][n-1],
+            flux: data['flux'][n-1],
+            j: data['j'][n-1],
+            k: data['k'][n-1]
+        }
+        fetch(`${window.origin}/add`, {
+            method: "POST",
+            credentials: "include",
+            body: JSON.stringify(entry),
+            cache: "no-cache",
+            headers: new Headers({
+                "content-type": "application/json"
+            })
+        })
+        .then(function (response) {
+            if (response.status !== 200) {
+                console.log(`Looks like there was a problem. Status code: ${response.status}`);
+                return;
+            }
+            response.json().then(function (table) {
+                data['ra'][n-1] = table['ra'];
+                data['dec'][n-1] = table['dec'];
+                data['x'][n-1] = table['x'];
+                data['y'][n-1] = table['y'];
+                data['flux'][n-1] = table['flux'];
+                data['j'][n-1] = table['j'];
+                data['k'][n-1] = table['k'];
+
+                cb_obj.change.emit()
+                console.log('Deu certo')
+            });
+        })
+        .catch(function (error) {
+            console.log("Fetch error: " + error);
         });
-    })
-    .catch(function (error) {
-        console.log("Fetch error: " + error);
-    });
+    };
+    // Atualiza o comprimento da tabela
+    N = n;
 }
 
 function contrast_onchange(cb_obj, source, im) {
