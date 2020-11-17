@@ -9,3 +9,4 @@ launch.json
 *.ipynb
 *.corr
 *.xlsx
+data.json

@@ -7,13 +7,18 @@
     <link rel="shortcut icon" href="{{ url_for('static', filename='favicon.ico') }}">
 
     <meta property="og:image" content="{{ url_for('static', filename='icons/BlackWomanFistUp.jpg') }}">
+    
 
   </head>
   <body>
     <h1>Inicia a redução fazendo o upload da imagem</h1>
     <form method="POST" action="" enctype="multipart/form-data">
-      <p>Escolha um arquivo .fits ou .fit<br>
-        <input type="file" name="fits"></p>
+      <label for="refname">Nome para referenciar a análise:</label><br>
+      <input type="text" id="refname" name="refname">
+      <p>Escolha os arquivos .fits ou .fit<br>
+        <b>B:</b> <input type="file" name="fitsB" multiple></p>
+        <b>V:</b> <input type="file" name="fitsV" multiple></p>
+        <b>R:</b> <input type="file" name="fitsR" multiple></p>
       <p><input type="submit" value="Iniciar"></p>
     </form>
     <!-- {{ the_div|safe }} -->

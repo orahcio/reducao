@@ -49,19 +49,24 @@ const get_name = () => {
     return aux;
 }
 
+
+var activeTab = 'na'
 const COLORS = ['red','yellow','blue'];
 var N = 0;
 
-function source_onchange(cb_obj, radio) {
+
+function source_onchange(cb_obj, radio, graficos) {
+
+    const active = graficos.active
+    const banda = graficos.tabs[active].title
     var data = cb_obj.data;
 
     const n = data['x'].length;
     if(n>N) {
         const labels = radio.labels;
         if(data['tipo'][n-1]=='na') {
-            data['fit'][n-1] = get_name();
             data['tipo'][n-1] = labels[radio.active];
-            data['banda'][n-1] = 'undef';
+            data['banda'][n-1] = banda;
         }
         data['color'][n-1] = COLORS[radio.active];
         cb_obj.change.emit();
@@ -111,8 +116,47 @@ function source_onchange(cb_obj, radio) {
     N = n;
 }
 
-function contrast_onchange(cb_obj, source, im) {
-    const x = im
+
+const clip = (y) => {
+    const ni = y.length
+    const nj = y[0].length
+
+    var max = 0 
+    var min = 2**64-1
+
+    for(let i=0;i<ni;i++) {
+        for(let j=0;j<nj;j++) {
+            if(max<y[i][j]) { max=y[i][j] }
+            if(min>y[i][j]) { min=y[i][j] }
+        }
+    }
+    for(let i=0;i<ni;i++) {
+        for(let j=0;j<nj;j++) {
+            y[i][j] = (y[i][j]-min)/(max-min)
+        }
+    }
+
+    return y
+}
+
+
+var active = 0;
+
+
+function tabs_onchange(cb_obj) {
+    active = cb_obj.active;
+    activeTab = cb_obj.tabs[active].title
+
+    console.log(activeTab)
+    console.log(cb_obj)
+}
+
+
+function contrast_onchange(cb_obj, tabs, im) {
+
+    const x = im[active]
+    var source = tabs[active].child.renderers[0].data_source
+
     var y = source.data['image'][0];
     // console.log(y)
     const ni = y.length
@@ -120,25 +164,9 @@ function contrast_onchange(cb_obj, source, im) {
     const n = ni*nj
     var c = cb_obj.value
     // console.log(c)
-    var max = 0 
-    var min = 2**64-1
 
     // console.log('x: ', x) 
     // Clip values
-    const clip = (y) => {
-        for(let i=0;i<ni;i++) {
-            for(let j=0;j<nj;j++) {
-                if(max<y[i][j]) { max=y[i][j] }
-                if(min>y[i][j]) { min=y[i][j] }
-            }
-        }
-        for(let i=0;i<ni;i++) {
-            for(let j=0;j<nj;j++) {
-                y[i][j] = (y[i][j]-min)/(max-min)
-            }
-        }
-        return y
-    }
     y = clip(y)
     for(let i=0;i<ni;i++) {
         for(let j=0;j<nj;j++) {

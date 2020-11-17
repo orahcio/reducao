@@ -1,7 +1,8 @@
 from bokeh.plotting import figure
 from bokeh.embed import components
-from bokeh.models import ColumnDataSource, DataTable, TableColumn, PointDrawTool, Spinner, WheelZoomTool, RadioGroup,\
-    CustomJS, Paragraph, Button, Slider, TextInput, Toggle, Div
+from bokeh.models import ColumnDataSource, DataTable, TableColumn, PointDrawTool, Spinner, WheelZoomTool,\
+    RadioGroup, CustomJS, Paragraph, Button, Slider, TextInput, Toggle, Div, Tabs, Panel, CDSView,\
+    GroupFilter
 from bokeh.layouts import column, row
 
 import colorcet as cc
@@ -36,6 +37,7 @@ import base64
 UPLOAD_FOLDER = './upfolder'
 ALLOWED_EXTENSIONS = ['fit', 'fits','corr']
 FITs = '[.fit|.fits]'
+BANDAS = ['fitsB','fitsV','fitsR']
 
 
 app = Flask(__name__)
@@ -70,51 +72,62 @@ def interface():
 @app.route('/', methods=['GET', 'POST'])
 def upload_file():
     if request.method == 'POST':
-        # check if the post request has the file part
-        if 'fits' not in request.files:
-            flash('Um dos arquivos não foi postado')
+        pathname = app.config['UPLOAD_FOLDER']+'/'+request.form.get('refname')
+        if not os.path.exists(pathname):
+            os.mkdir(pathname)
 
-            return redirect(request.url)
+        # Definindo dados da análise para serem salvos junto com os arquivos
+        dirdata = dict(
+            name = request.form.get('refname'),
+            r = 8
+        )
 
-        ffit = request.files['fits']
-        # if user does not select file, browser also
-        # submit an empty part without filename
-        if ffit.filename == '':
-            
-            flash('Ficou faltando selecionar algum arquivo')
-            return redirect(request.url)
+        # Upload de arquivos e salvando dados da sessão para serem salvosjuntos
+        for banda in request.files.keys():
+            dirdata[banda] = []
+            for ffit in request.files.getlist(banda):
+                if allowed_file(ffit.filename):
+                    filename = secure_filename(ffit.filename)
+                    ffit.save(os.path.join(pathname, filename))
+                    dirdata[banda].append(filename)
 
-        if ffit and allowed_file(ffit.filename):
-            filename = secure_filename(ffit.filename)
-            ffit.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
+        with open(pathname+'/data.json', 'w') as f:
+            json.dump(dirdata,f)
 
-            return redirect(url_for('plotfits',filename=filename))
+        return redirect(url_for('plotfits',dirname=dirdata['name']))
 
-    return redirect(url_for('interface'))
+    # return redirect(url_for('interface'))
 
 
-@app.route('/plot/<filename>')
-def plotfits(filename):
+def plot():
+    '''
+    Constrói um plot
+    '''
 
-    # Abrindo e pegando dados da sessao
-    if 'name' not in session:
-        session['name'] = filename
-    elif session.get('name') != filename:
-        session.pop('r', None)
-        session.pop('stats', None)
-        session.modifeid = True
-        session['name'] = filename
-    print('Sessão: ', session['name'])
 
-    if 'r' in session:
-        r = session.get('r')
-    else:
-        r = 8
-        session['r'] = r # 8 é o valor que defini como padrão mínimo
+@app.route('/plot/<dirname>')
+def plotfits(dirname):
     
+    pathname = app.config['UPLOAD_FOLDER']+'/'+dirname+'/'
+    with open(pathname+'data.json') as f:
+        dirdata = json.load(f)
+
+    r = dirdata['r']
+    
+    # Faz logo algumas estatísticas da imagem
+    dirdata['stats'] = {}
+    for fil in BANDAS:
+        dirdata['stats'][fil] = []
+        for fname in dirdata[fil]:
+            img = fits.getdata(pathname+fname)
+            print(fname)
+            dirdata['stats'][fil].append(sigma_clipped_stats(img,sigma=3.0))
+
+    with open(pathname+'data.json','w') as f:
+        json.dump(dirdata,f)
+
     # Dados que serão usados para fazer computação e visualizar os pontos
     source = ColumnDataSource(dict(
-        fit=[], # a tabela informa qual arquivo aqueles dados se refere
         ra=[],
         dec=[],
         x=[],
@@ -123,38 +136,19 @@ def plotfits(filename):
         j = [],
         k = [],
         tipo=[], # se é obj, src ou sky
-        banda=[], # o filtro da imagem
-        color=[]
+        banda=[], # o filtro da imagem e arquivo
+        color=[] # para colorir de acordo o tipo de objeto
     ))
-
-    # Abrindo imagem
-    with fits.open('upfolder/'+filename) as f:
-        img = f[0].data
-        celestial = WCS(f[0].header).has_celestial
-
-    # Uma matriz pra fazer testes
-    # img = np.array([[0,  1,  2,  3],
-                    # [4,  5,  6,  7],
-                    # [8,  9, 10, 11]])
-    
-    # Faz logo algumas estatísticas da imagem
-    if 'stats' not in session:
-       session['stats'] = sigma_clipped_stats(img, sigma=3.0)
 
     # Abrindo coordenadas se salvas
     try:
-        corname = 'upfolder/'+filename.strip('[.fit|.fits]')+'.xlsx'
-        cordata = pd.read_excel(corname)
+        cordata = pd.read_excel(pathname+'data.xlsx')
         # Dados que serão usados para fazer computação e visualizar os pontos
         source = ColumnDataSource(cordata)
 
         print('Coordenadas carregadas.')
     except FileNotFoundError:
-        print('Não há coordenadas salvas: %s' % corname)
-
-    stretch = HistEqStretch(img) # Histograma, melhor função para granular a imagem
-    h,w = img.shape # número de linhas e colunas da matriz da imagem
-    print(h,w)
+        print('Não há coordenadas salvas em %s' % pathname)
 
     # Constrói a tabaela de dados que poderá ser usada para designar as posições do objeto, estrela e céu
     tabela = DataTable(source=source,columns=[
@@ -168,31 +162,40 @@ def plotfits(filename):
         TableColumn(field='tipo',title='tipo')
     ], editable=True)
     
-    # Plota a imagem do arquivo fit
-    p = figure(plot_height=h, plot_width=w, tooltips=[("x", "$x"), ("y", "$y"), ("value", "@image")],\
-        active_scroll='wheel_zoom')
-    nimg = stretch(normal(img)).tolist()
-    # print(nimg.tolist())
-    # print(img.tolist())
-    im = p.image(image=[nimg], x=0, y=0, dw=w, dh=h, palette='Greys256', level="image")
-    # im = p.image(image=[img], x=0, y=0, dw=w, dh=h, palette=cc.CET_CBL2, level="image")
-    p.x_range.range_padding = p.y_range.range_padding = 0
-    p.grid.grid_line_width = 0
+    P = [] # lista de gráficos para o plot
+    Nimg = [] # lista de imagens normalizadas para o contraste
+    for fil in BANDAS:
+        for fname in dirdata[fil]:
+            img = fits.getdata(pathname+fname)
+            stretch = HistEqStretch(img) # Histograma, melhor função para granular a imagem
+            h,w = img.shape # número de linhas e colunas da matriz da imagem
+            nimg = stretch(normal(img)).tolist()
+            p = figure(plot_width=700, active_scroll='wheel_zoom')
+            p.image(image=[nimg], x=0, y=0, dw=w, dh=h, palette='Greys256', level="image")
+            p.x_range.range_padding = p.y_range.range_padding = 0
+            p.grid.grid_line_width = 0
 
-    # Os círculos que serão inseridos
-    c = p.circle('x','y', source=source, color='color', fill_color=None, radius=r, line_width=2)
-    cd = p.circle_dot('x','y', source=source, color='color', size=2)
-    tool = PointDrawTool(renderers=[c,cd],empty_value='na')
-    p.add_tools(tool)
-    p.toolbar.active_tap = tool
-    p.toolbar.active_inspect = None
+            view = CDSView(source=source,filters=[GroupFilter(column_name='banda', group=fil+':'+fname)])
+            c = p.circle('x','y', source=source, view=view, color='color', fill_color=None, radius=r, line_width=2)
+            cd = p.circle_dot('x','y', source=source, view=view, color='color', size=2)
+            tool = PointDrawTool(renderers=[c,cd],empty_value='na')
+            p.add_tools(tool)
+            p.toolbar.active_tap = tool
+            p.toolbar.active_inspect = None
 
-    # Coluna de controles de interação
-    # Muda o raio da abertura fotométrica
-    spinner = Spinner(title="Raio", low=1, high=40, step=0.5, value=r, width=80)
-    spinner.js_link('value', c.glyph, 'radius')
-    spinner.js_on_change('value', CustomJS(args=dict(source=source), code='''
-    radius_onchange(cb_obj,source);
+            tab = Panel(child=p, title=fil+':'+fname)
+
+            P.append(tab)
+            Nimg.append(nimg)
+    
+    graficos = Tabs(tabs=P)
+    graficos.js_on_change('active', CustomJS(code='''
+    tabs_onchange(cb_obj);
+    '''))
+
+    contrast = Slider(start=-1, end=6, value=1, step=0.05, title="Contraste")
+    contrast.js_on_change('value',CustomJS(args = dict(tabs=graficos.tabs, im=Nimg), code = '''
+    contrast_onchange(cb_obj,tabs,im);
     '''))
 
     # Selecionar o tipo de fonte luminosa: obj, src ou sky
@@ -201,55 +204,93 @@ def plotfits(filename):
     radio_group = RadioGroup(labels=LABELS, active=0)
 
     # Evento de mudança da tabela de dados, para inserir dados padrão nas colunas inalteradas
-    source.js_on_change('data', CustomJS(args=dict(radio=radio_group), code='''
-    source_onchange(cb_obj, radio);
+    source.js_on_change('data', CustomJS(args=dict(radio=radio_group, graficos=graficos), code='''
+    source_onchange(cb_obj, radio, graficos);
     '''))
-    # Fazer o upload do corr.fit da imagem (defasado)
-
-    contrast = Slider(start=-1, end=6, value=1, step=0.05, title="Contraste")
-    contrast.js_on_change('value',CustomJS(args = dict(source=im.data_source, im=nimg), code = '''
-    contrast_onchange(cb_obj,source,im)
-    '''))
-
-    # Coluna de requisição
-    text1 = Div(text='<b>Instruções:</b><p>1. Digite a chave do Astrometry.net')
-    apikey_input = TextInput(title='Apikey do Astrometry.net', placeholder='digite a chave aqui')
-
-    text2 = Div(text='2. Clique abaixo pra requisitar a correção WCS')
-    send_astrometry = Toggle(label='Solução de placa do astrometry.net', disabled=celestial)
-    send_astrometry.js_on_click(CustomJS(args=dict(key=apikey_input, source=source), code='''
-    send_astrometry(cb_obj,key,source);
+    
+    # Muda o raio da abertura fotométrica
+    spinner = Spinner(title="Raio", low=1, high=40, step=0.5, value=r, width=80)
+    spinner.js_link('value', c.glyph, 'radius')
+    spinner.js_on_change('value', CustomJS(args=dict(source=source), code='''
+    radius_onchange(cb_obj,source);
     '''))
 
-    text3 = Div(text='3. Após escolher as fontes no gráfico e ajustar o raio, clique abaixo pra requisitar as magnitudes j e k')
-    busca_2mass = Button(label='2MASS',button_type='success')
-    busca_2mass.js_on_click(CustomJS(args=dict(source=source), code='''
-    send_2mass(source)
-    '''))
+    # print(h,w)
 
-    text4 = Div(text='4. Salve a tabela de dados clicando abaixo para download')
-    # o Botão de salvar irá enviar um json para o servidor que irá ler e fazer os procedimentos posteriores
-    salvar = Button(label='Salvar tabela', button_type="success")
-    salvar.js_on_click(CustomJS(args=dict(source=source), code='''
-    salvar_onclick(source);
-    '''))
+    # # Plota a imagem do arquivo fit
+    # p = figure(plot_height=h, plot_width=w, tooltips=[("x", "$x"), ("y", "$y"), ("value", "@image")],\
+    #     active_scroll='wheel_zoom')
+    # nimg = stretch(normal(img)).tolist()
+    # # print(nimg.tolist())
+    # # print(img.tolist())
+    # im = p.image(image=[nimg], x=0, y=0, dw=w, dh=h, palette='Greys256', level="image")
+    # # im = p.image(image=[img], x=0, y=0, dw=w, dh=h, palette=cc.CET_CBL2, level="image")
+    # p.x_range.range_padding = p.y_range.range_padding = 0
+    # p.grid.grid_line_width = 0
 
-    reset = Button(label='Limpar', button_type='success')
-    reset.js_on_click(CustomJS(args=dict(source=source), code='''
-    reset_onclick(source);
-    '''))
+    # # Os círculos que serão inseridos
+    # c = p.circle('x','y', source=source, color='color', fill_color=None, radius=r, line_width=2)
+    # cd = p.circle_dot('x','y', source=source, color='color', size=2)
+    # tool = PointDrawTool(renderers=[c,cd],empty_value='na')
+    # p.add_tools(tool)
+    # p.toolbar.active_tap = tool
+    # p.toolbar.active_inspect = None
 
-    test = Button(label='Teste',button_type='success')
-    test.js_on_click(CustomJS(args=dict(radio=radio_group,source=source,r=c.glyph.radius), code='''
-    f(cb_obj,radio,source,r);
-    '''))
-    print('raio: ',c.glyph.radius)
-    div, script = components(row(column(spinner,contrast,radio_title,radio_group,
-                                        reset,test),
-                                 column(p,tabela, sizing_mode='scale_width'),
-                                 column(text1,apikey_input,text2,send_astrometry,\
-                                     text3,busca_2mass,text4,salvar)))
-    return render_template('plot.html', the_div=div, the_script=script,filename=session['name'])
+    # # Coluna de controles de interação
+    # # Muda o raio da abertura fotométrica
+    # spinner = Spinner(title="Raio", low=1, high=40, step=0.5, value=r, width=80)
+    # spinner.js_link('value', c.glyph, 'radius')
+    # spinner.js_on_change('value', CustomJS(args=dict(source=source), code='''
+    # radius_onchange(cb_obj,source);
+    # '''))
+
+    # # Selecionar o tipo de fonte luminosa: obj, src ou sky
+    # radio_title = Paragraph(text='Escolha o tipo:')
+    # LABELS = ['obj','src','sky']
+    # radio_group = RadioGroup(labels=LABELS, active=0)
+
+    # # Evento de mudança da tabela de dados, para inserir dados padrão nas colunas inalteradas
+    # source.js_on_change('data', CustomJS(args=dict(radio=radio_group), code='''
+    # source_onchange(cb_obj, radio);
+    # '''))
+    # # Fazer o upload do corr.fit da imagem (defasado)
+
+
+    # # Coluna de requisição
+    # text1 = Div(text='<b>Instruções:</b><p>1. Digite a chave do Astrometry.net')
+    # apikey_input = TextInput(title='Apikey do Astrometry.net', placeholder='digite a chave aqui')
+
+    # text2 = Div(text='2. Clique abaixo pra requisitar a correção WCS')
+    # send_astrometry = Toggle(label='Solução de placa do astrometry.net', disabled=celestial)
+    # send_astrometry.js_on_click(CustomJS(args=dict(key=apikey_input, source=source), code='''
+    # send_astrometry(cb_obj,key,source);
+    # '''))
+
+    # text3 = Div(text='3. Após escolher as fontes no gráfico e ajustar o raio, clique abaixo pra requisitar as magnitudes j e k')
+    # busca_2mass = Button(label='2MASS',button_type='success')
+    # busca_2mass.js_on_click(CustomJS(args=dict(source=source), code='''
+    # send_2mass(source)
+    # '''))
+
+    # text4 = Div(text='4. Salve a tabela de dados clicando abaixo para download')
+    # # o Botão de salvar irá enviar um json para o servidor que irá ler e fazer os procedimentos posteriores
+    # salvar = Button(label='Salvar tabela', button_type="success")
+    # salvar.js_on_click(CustomJS(args=dict(source=source), code='''
+    # salvar_onclick(source);
+    # '''))
+
+    # reset = Button(label='Limpar', button_type='success')
+    # reset.js_on_click(CustomJS(args=dict(source=source), code='''
+    # reset_onclick(source);
+    # '''))
+
+    # test = Button(label='Teste',button_type='success')
+    # test.js_on_click(CustomJS(args=dict(radio=radio_group,source=source,r=c.glyph.radius), code='''
+    # f(cb_obj,radio,source,r);
+    # '''))
+    # print('raio: ',c.glyph.radius)
+    div, script = components(row(column(contrast,radio_title,radio_group),graficos))
+    return render_template('plot.html', the_div=div, the_script=script,filename=dirdata['name'])
 
 
 @app.route('/fluxes', methods=['POST'])
