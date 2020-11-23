@@ -1,5 +1,9 @@
 
-function radius_onchange(cb_obj,source) {
+function radius_onchange(cb_obj,source,tabs) {
+
+    for(let i=0;i<tabs.length;i++) {
+        tabs[i].child.renderers[1].glyph.radius = cb_obj.value
+    }
 
     let data = source.data
     const n = data['x'].length
@@ -10,7 +14,8 @@ function radius_onchange(cb_obj,source) {
         r: cb_obj.value,
         x: [].slice.call(data['x']), // converte os valores pra um array normal
         y: [].slice.call(data['y']),
-        flux: [].slice.call(data['flux'])
+        flux: [].slice.call(data['flux']),
+        banda: data['banda']
     }
     console.log(entry)
     fetch(`${window.origin}/fluxes`, {
@@ -79,7 +84,8 @@ function source_onchange(cb_obj, radio, graficos) {
             dec: data['dec'][n-1],
             flux: data['flux'][n-1],
             j: data['j'][n-1],
-            k: data['k'][n-1]
+            k: data['k'][n-1],
+            banda: data['banda'][n-1]
         }
         fetch(`${window.origin}/add`, {
             method: "POST",
@@ -233,11 +239,12 @@ function salvar_onclick(source) {
 
 }
 
-function send_astrometry(cb_obj, key, source) {
+function send_astrometry(cb_obj, key, source, selected) {
     var entry = source.data;
-    var name = `${window.location.pathname}`;
-    name = name.slice(6,name.length);
+    var name = `${window.location.pathname}`.split('/')[2];
+    name = name + '/' + selected.value.split(':')[1];
     const url = window.origin + '/astrometry_net/'+key.value+'/'+name
+    console.log(url)
 
     if(key.value==='') {
         cb_obj.label = 'Solução de placa do astrometry.net (sem chave)'

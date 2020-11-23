@@ -2,13 +2,13 @@ from bokeh.plotting import figure
 from bokeh.embed import components
 from bokeh.models import ColumnDataSource, DataTable, TableColumn, PointDrawTool, Spinner, WheelZoomTool,\
     RadioGroup, CustomJS, Paragraph, Button, Slider, TextInput, Toggle, Div, Tabs, Panel, CDSView,\
-    GroupFilter
+    GroupFilter, Select
 from bokeh.layouts import column, row
 
 import colorcet as cc
 
 from flask import Flask, flash, render_template, request, redirect, url_for,\
-                  send_from_directory, jsonify, make_response, session
+                  send_from_directory, jsonify, make_response, session, g
 import json
 from werkzeug.utils import secure_filename
 import os
@@ -108,23 +108,25 @@ def plot():
 @app.route('/plot/<dirname>')
 def plotfits(dirname):
     
-    pathname = app.config['UPLOAD_FOLDER']+'/'+dirname+'/'
-    with open(pathname+'data.json') as f:
+    session.modifeid = True
+    session['pathname'] = app.config['UPLOAD_FOLDER']+'/'+dirname+'/'
+    session['stats'] = {}
+
+    with open(session['pathname']+'data.json') as f:
         dirdata = json.load(f)
 
     r = dirdata['r']
-    
+    session['r'] = r
+    celestial = False
     # Faz logo algumas estatísticas da imagem
-    dirdata['stats'] = {}
     for fil in BANDAS:
-        dirdata['stats'][fil] = []
         for fname in dirdata[fil]:
-            img = fits.getdata(pathname+fname)
-            print(fname)
-            dirdata['stats'][fil].append(sigma_clipped_stats(img,sigma=3.0))
+            img, header = fits.getdata(session['pathname']+fname, header=True)
+            session['stats'][fil+':'+fname] = sigma_clipped_stats(img,sigma=3.0)
 
-    with open(pathname+'data.json','w') as f:
-        json.dump(dirdata,f)
+            if not celestial:
+                celestial = WCS(header).has_celestial
+                session['wcs'] = session['pathname']+fname
 
     # Dados que serão usados para fazer computação e visualizar os pontos
     source = ColumnDataSource(dict(
@@ -142,13 +144,13 @@ def plotfits(dirname):
 
     # Abrindo coordenadas se salvas
     try:
-        cordata = pd.read_excel(pathname+'data.xlsx')
+        cordata = pd.read_excel(session['pathname']+'data.xlsx')
         # Dados que serão usados para fazer computação e visualizar os pontos
         source = ColumnDataSource(cordata)
 
         print('Coordenadas carregadas.')
     except FileNotFoundError:
-        print('Não há coordenadas salvas em %s' % pathname)
+        print('Não há coordenadas salvas em %s' % session['pathname'])
 
     # Constrói a tabaela de dados que poderá ser usada para designar as posições do objeto, estrela e céu
     tabela = DataTable(source=source,columns=[
@@ -159,14 +161,16 @@ def plotfits(dirname):
         TableColumn(field='flux',title='flux'),
         TableColumn(field='j',title='j'),
         TableColumn(field='k',title='k'),
-        TableColumn(field='tipo',title='tipo')
+        TableColumn(field='tipo',title='tipo'),
+        TableColumn(field='banda',title='banda')
     ], editable=True)
     
+
     P = [] # lista de gráficos para o plot
     Nimg = [] # lista de imagens normalizadas para o contraste
     for fil in BANDAS:
         for fname in dirdata[fil]:
-            img = fits.getdata(pathname+fname)
+            img = fits.getdata(session['pathname']+fname)
             stretch = HistEqStretch(img) # Histograma, melhor função para granular a imagem
             h,w = img.shape # número de linhas e colunas da matriz da imagem
             nimg = stretch(normal(img)).tolist()
@@ -211,62 +215,25 @@ def plotfits(dirname):
     # Muda o raio da abertura fotométrica
     spinner = Spinner(title="Raio", low=1, high=40, step=0.5, value=r, width=80)
     spinner.js_link('value', c.glyph, 'radius')
-    spinner.js_on_change('value', CustomJS(args=dict(source=source), code='''
-    radius_onchange(cb_obj,source);
+    spinner.js_on_change('value', CustomJS(args=dict(source=source, tabs=graficos.tabs), code='''
+    radius_onchange(cb_obj,source,tabs);
     '''))
 
-    # print(h,w)
+    # Coluna de requisição
+    text1 = Div(text='<b>Instruções:</b><p>1. Digite a chave do Astrometry.net')
+    apikey_input = TextInput(title='Apikey do Astrometry.net', placeholder='digite a chave aqui')
 
-    # # Plota a imagem do arquivo fit
-    # p = figure(plot_height=h, plot_width=w, tooltips=[("x", "$x"), ("y", "$y"), ("value", "@image")],\
-    #     active_scroll='wheel_zoom')
-    # nimg = stretch(normal(img)).tolist()
-    # # print(nimg.tolist())
-    # # print(img.tolist())
-    # im = p.image(image=[nimg], x=0, y=0, dw=w, dh=h, palette='Greys256', level="image")
-    # # im = p.image(image=[img], x=0, y=0, dw=w, dh=h, palette=cc.CET_CBL2, level="image")
-    # p.x_range.range_padding = p.y_range.range_padding = 0
-    # p.grid.grid_line_width = 0
+    text2 = Div(text='''<p>2. Selecione qual imagem será usada como referência para o astrometry.net e
+    para o cálculo das coordenadas celestes</p>''')
+    seletor = Select(title='Escolha a imagem de referência', options=[*session['stats'].keys()])
 
-    # # Os círculos que serão inseridos
-    # c = p.circle('x','y', source=source, color='color', fill_color=None, radius=r, line_width=2)
-    # cd = p.circle_dot('x','y', source=source, color='color', size=2)
-    # tool = PointDrawTool(renderers=[c,cd],empty_value='na')
-    # p.add_tools(tool)
-    # p.toolbar.active_tap = tool
-    # p.toolbar.active_inspect = None
+    text3 = Div(text='3. Clique abaixo pra requisitar a correção WCS')
+    send_astrometry = Toggle(label='Solução de placa do astrometry.net', disabled=celestial)
+    send_astrometry.js_on_click(CustomJS(args=dict(key=apikey_input, source=source, selected=seletor), code='''
+    send_astrometry(cb_obj,key,source,selected);
+    '''))
 
-    # # Coluna de controles de interação
-    # # Muda o raio da abertura fotométrica
-    # spinner = Spinner(title="Raio", low=1, high=40, step=0.5, value=r, width=80)
-    # spinner.js_link('value', c.glyph, 'radius')
-    # spinner.js_on_change('value', CustomJS(args=dict(source=source), code='''
-    # radius_onchange(cb_obj,source);
-    # '''))
-
-    # # Selecionar o tipo de fonte luminosa: obj, src ou sky
-    # radio_title = Paragraph(text='Escolha o tipo:')
-    # LABELS = ['obj','src','sky']
-    # radio_group = RadioGroup(labels=LABELS, active=0)
-
-    # # Evento de mudança da tabela de dados, para inserir dados padrão nas colunas inalteradas
-    # source.js_on_change('data', CustomJS(args=dict(radio=radio_group), code='''
-    # source_onchange(cb_obj, radio);
-    # '''))
-    # # Fazer o upload do corr.fit da imagem (defasado)
-
-
-    # # Coluna de requisição
-    # text1 = Div(text='<b>Instruções:</b><p>1. Digite a chave do Astrometry.net')
-    # apikey_input = TextInput(title='Apikey do Astrometry.net', placeholder='digite a chave aqui')
-
-    # text2 = Div(text='2. Clique abaixo pra requisitar a correção WCS')
-    # send_astrometry = Toggle(label='Solução de placa do astrometry.net', disabled=celestial)
-    # send_astrometry.js_on_click(CustomJS(args=dict(key=apikey_input, source=source), code='''
-    # send_astrometry(cb_obj,key,source);
-    # '''))
-
-    # text3 = Div(text='3. Após escolher as fontes no gráfico e ajustar o raio, clique abaixo pra requisitar as magnitudes j e k')
+    # text4 = Div(text='3. Após escolher as fontes no gráfico e ajustar o raio, clique abaixo pra requisitar as magnitudes j e k')
     # busca_2mass = Button(label='2MASS',button_type='success')
     # busca_2mass.js_on_click(CustomJS(args=dict(source=source), code='''
     # send_2mass(source)
@@ -289,7 +256,9 @@ def plotfits(dirname):
     # f(cb_obj,radio,source,r);
     # '''))
     # print('raio: ',c.glyph.radius)
-    div, script = components(row(column(contrast,radio_title,radio_group),graficos))
+    div, script = components(row(column(contrast,spinner,radio_title,radio_group),\
+        column(graficos, tabela),
+        column(text1,apikey_input,text2,seletor,text3,send_astrometry)))
     return render_template('plot.html', the_div=div, the_script=script,filename=dirdata['name'])
 
 
@@ -304,25 +273,28 @@ def recalc_fluxes():
     data = pd.DataFrame(dict(
         x=req['x'],
         y=req['y'],
-        flux=req['flux']
+        flux=req['flux'],
+        banda=req['banda']
     ))
 
-    with fits.open(UPLOAD_FOLDER+'/'+session['name']) as f:
-        img = f[0].data
     r = req['r']
     session.modifeid = True
     session['r'] = r
 
-    aperture = CircularAperture(data[['x','y']], r)
-    fluxes = aperture_photometry(img,aperture)
-    data['flux'] = fluxes['aperture_sum']
+    for banda in data['banda']:
+        fname = banda.split(':')[1]
+        img = fits.getdata(session['pathname']+fname)
+        aperture = CircularAperture(data[['x','y']][data['banda']==banda], r)
+        fluxes = aperture_photometry(img,aperture)
+        data['flux'][data['banda']==banda] = fluxes['aperture_sum']
+
 
     res = make_response(data.to_json(),200)
 
     return res
 
 
-def centralizar(img, cx, cy):
+def centralizar(img, banda, cx, cy):
     '''
     Encontra uma fonte dentro de uma abertura com o raio definido pelo usuário
     '''
@@ -334,7 +306,7 @@ def centralizar(img, cx, cy):
     aperture = CircularAperture((cx,cy), r)
     mask = aperture.to_mask()
     print(mask)
-    mean, median, std = session['stats']
+    _, median, std = session['stats'][banda]
     find = DAOStarFinder(fwhm=3, threshold=3*std)
     cr = find((img-median)*mask.to_image(img.shape))
     if cr:
@@ -358,11 +330,11 @@ def query_2MASS(ra,dec):
     Busca no 2MASS dado um campo com o raio definido pelo usuário
     '''
 
-    w = WCS(fits.getheader(UPLOAD_FOLDER+'/'+session['name']))
+    w = WCS(fits.getheader(session['wcs']))
     r = session['r']
-    o = SkyCoord(w.wcs_pix2world([(0,0)],1), unit='deg')
-    opr = SkyCoord(w.wcs_pix2world([(r,r)],1), unit='deg')
-    rw = o.separation(opr)[0]
+    orim = SkyCoord(w.wcs_pix2world([(0,0)],1), unit='deg')
+    opr = SkyCoord(w.wcs_pix2world([(r,0)],1), unit='deg')
+    rw = orim.separation(opr)[0]
     print('Separação',rw)
 
     crval = SkyCoord(ra=ra, dec=dec, unit='deg', frame='icrs')
@@ -371,7 +343,7 @@ def query_2MASS(ra,dec):
                            selcols=['ra','dec','j_m','k_m']).to_pandas()
     print(Q)
     m = SkyCoord(ra=Q['ra'],dec=Q['dec'], unit=('deg','deg'), frame='icrs')
-    idx, d2, _ = match_coordinates_sky(crval,m)
+    idx, _, _ = match_coordinates_sky(crval,m)
 
     j , k = Q.loc[idx][['j_m','k_m']]
     return j, k
@@ -386,21 +358,20 @@ def add_radec():
     2- Calcula as coordenadas celestiais se houver correção astrométrica
     3- Calcula o fluxo
     '''
-
+    
     req = request.get_json()
-
-    with fits.open(UPLOAD_FOLDER+'/'+session['name']) as f:
-        img = f[0].data
+    fname = req['banda'].split(':')[1]
+    img = fits.getdata(session['pathname']+fname)
 
     # Faz a fotometria de abertura
     if not req['tipo'] == 'sky':
-        req['x'], req['y'] = centralizar(img,req['x'],req['y'])
+        req['x'], req['y'] = centralizar(img,req['banda'],req['x'],req['y'])
     aperture = CircularAperture((req['x'],req['y']), session['r'])
     fluxes = aperture_photometry(img,aperture)
     req['flux'] = fluxes['aperture_sum'][0]
 
     # Pega as coordenadas celestes se houver correção
-    w = WCS(fits.getheader(UPLOAD_FOLDER+'/'+session['name']))
+    w = WCS(fits.getheader(session['wcs']))
     if w.has_celestial:
         ra, dec = w.wcs_pix2world([(req['x'],req['y'])],1)[0]
         req['ra'] = ra
@@ -448,8 +419,8 @@ def solveplateastrometry(key,data,force_upload=False):
     return wcs_header
 
 
-@app.route("/astrometry_net/<key>/<filename>", methods=["POST","GET"])
-def astrometrysolve(key,filename):
+@app.route("/astrometry_net/<key>/<dirname>/<filename>", methods=["POST","GET"])
+def astrometrysolve(key,dirname,filename):
     '''
     Essa função faz a requisição para o astrometry.net,
     tem espaço para usar o método get, possivelmente implementarei
@@ -461,7 +432,7 @@ def astrometrysolve(key,filename):
         req = request.get_json()
         data = pd.DataFrame(req)
         sdata = data[data['tipo']=='src']
-        filepath = UPLOAD_FOLDER+'/'+filename
+        filepath = UPLOAD_FOLDER+'/'+dirname+'/'+filename
 
         # Primeira tentativa apenas com a lista de estrelas
         if len(data):
@@ -480,6 +451,7 @@ def astrometrysolve(key,filename):
         if isinstance(wcs_header,fits.Header):
             with fits.open(filepath,'update') as f:
                 f[0].header = f[0].header+wcs_header
+            session['wcs'] = filepath
             
             return make_response({'message': 'OK'}, 200)
 
