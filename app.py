@@ -233,18 +233,12 @@ def plotfits(dirname):
     send_astrometry(cb_obj,key,source,selected);
     '''))
 
-    # text4 = Div(text='3. Após escolher as fontes no gráfico e ajustar o raio, clique abaixo pra requisitar as magnitudes j e k')
-    # busca_2mass = Button(label='2MASS',button_type='success')
-    # busca_2mass.js_on_click(CustomJS(args=dict(source=source), code='''
-    # send_2mass(source)
-    # '''))
-
-    # text4 = Div(text='4. Salve a tabela de dados clicando abaixo para download')
-    # # o Botão de salvar irá enviar um json para o servidor que irá ler e fazer os procedimentos posteriores
-    # salvar = Button(label='Salvar tabela', button_type="success")
-    # salvar.js_on_click(CustomJS(args=dict(source=source), code='''
-    # salvar_onclick(source);
-    # '''))
+    # o Botão de salvar irá enviar um json para o servidor que irá ler e fazer os procedimentos posteriores
+    text4 = Div(text='4. Salve a tabela de dados clicando abaixo para download')
+    salvar = Button(label='Salvar tabela', button_type="success")
+    salvar.js_on_click(CustomJS(args=dict(source=source), code='''
+    salvar_onclick(source);
+    '''))
 
     # reset = Button(label='Limpar', button_type='success')
     # reset.js_on_click(CustomJS(args=dict(source=source), code='''
@@ -258,7 +252,7 @@ def plotfits(dirname):
     # print('raio: ',c.glyph.radius)
     div, script = components(row(column(contrast,spinner,radio_title,radio_group),\
         column(graficos, tabela),
-        column(text1,apikey_input,text2,seletor,text3,send_astrometry)))
+        column(text1,apikey_input,text2,seletor,text3,send_astrometry,text4,salvar)))
     return render_template('plot.html', the_div=div, the_script=script,filename=dirdata['name'])
 
 
@@ -468,7 +462,7 @@ def create_entry():
     out = pd.DataFrame(req)
 
     if not out.empty:
-        out.to_excel('upfolder/'+out['fit'][0].strip(FITs)+'.xlsx')
+        out.to_excel(session['pathname']+'data.xlsx',index=False)
         res = make_response(jsonify({"message": "Arquivo salvo"}), 200)
 
         return res
@@ -511,10 +505,10 @@ def search_2MASS():
     return res
 
 
-@app.route('/download/<filename>')
-def uploaded_file(filename):
-    return send_from_directory(app.config['UPLOAD_FOLDER'],
-                               filename)
+@app.route('/download/<pathname>')
+def uploaded_file(pathname):
+    return send_from_directory(app.config['UPLOAD_FOLDER']+'/'+pathname,
+                               'data.xlsx')
 
 
 def main():
