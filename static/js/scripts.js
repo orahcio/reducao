@@ -73,7 +73,7 @@ function source_onchange(cb_obj, radio, graficos) {
             data['tipo'][n-1] = labels[radio.active];
             data['banda'][n-1] = banda;
         }
-        data['color'][n-1] = COLORS[radio.active];
+        data['colors'][n-1] = COLORS[radio.active];
         cb_obj.change.emit();
 
         entry = {
@@ -188,7 +188,8 @@ const make_entry = (data) => {
     return {
         banda: data['banda'],
         tipo: data['tipo'],
-        fit: data['fit'],
+        colors: data['colors'],
+        
         x: [].slice.call(data['x']),
         y: [].slice.call(data['y']),
         ra: [].slice.call(data['ra']),
@@ -338,13 +339,13 @@ function reset_onclick(source) {
     data['x'] = [];
     data['y'] = [];
     data['tipo'] = [];
-    data['fit'] = [];
     data['banda'] = [];
     data['ra'] = [];
     data['dec'] = [];
     data['flux'] = [];
     data['j'] = [];
     data['k'] = [];
+    data['colors'] = [];
 
     source.change.emit()
 }

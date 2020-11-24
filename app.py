@@ -99,12 +99,6 @@ def upload_file():
     # return redirect(url_for('interface'))
 
 
-def plot():
-    '''
-    Constrói um plot
-    '''
-
-
 @app.route('/plot/<dirname>')
 def plotfits(dirname):
     
@@ -128,20 +122,6 @@ def plotfits(dirname):
                 celestial = WCS(header).has_celestial
                 session['wcs'] = session['pathname']+fname
 
-    # Dados que serão usados para fazer computação e visualizar os pontos
-    source = ColumnDataSource(dict(
-        ra=[],
-        dec=[],
-        x=[],
-        y=[],
-        flux = [],
-        j = [],
-        k = [],
-        tipo=[], # se é obj, src ou sky
-        banda=[], # o filtro da imagem e arquivo
-        color=[] # para colorir de acordo o tipo de objeto
-    ))
-
     # Abrindo coordenadas se salvas
     try:
         cordata = pd.read_excel(session['pathname']+'data.xlsx')
@@ -151,6 +131,20 @@ def plotfits(dirname):
         print('Coordenadas carregadas.')
     except FileNotFoundError:
         print('Não há coordenadas salvas em %s' % session['pathname'])
+        # Dados que serão usados para fazer computação e visualizar os pontos
+        source = ColumnDataSource(dict(
+            ra=[],
+            dec=[],
+            x=[],
+            y=[],
+            flux = [],
+            j = [],
+            k = [],
+            tipo=[], # se é obj, src ou sky
+            banda=[], # o filtro da imagem e arquivo
+            
+            colors=[] # para colorir de acordo o tipo de objeto
+        ))
 
     # Constrói a tabaela de dados que poderá ser usada para designar as posições do objeto, estrela e céu
     tabela = DataTable(source=source,columns=[
@@ -180,8 +174,8 @@ def plotfits(dirname):
             p.grid.grid_line_width = 0
 
             view = CDSView(source=source,filters=[GroupFilter(column_name='banda', group=fil+':'+fname)])
-            c = p.circle('x','y', source=source, view=view, color='color', fill_color=None, radius=r, line_width=2)
-            cd = p.circle_dot('x','y', source=source, view=view, color='color', size=2)
+            c = p.circle('x','y', source=source, view=view, color='colors', fill_color=None, radius=r, line_width=2)
+            cd = p.circle_dot('x','y', source=source, view=view, color='colors', size=2)
             tool = PointDrawTool(renderers=[c,cd],empty_value='na')
             p.add_tools(tool)
             p.toolbar.active_tap = tool
@@ -240,17 +234,12 @@ def plotfits(dirname):
     salvar_onclick(source);
     '''))
 
-    # reset = Button(label='Limpar', button_type='success')
-    # reset.js_on_click(CustomJS(args=dict(source=source), code='''
-    # reset_onclick(source);
-    # '''))
+    reset = Button(label='Limpar', button_type='success')
+    reset.js_on_click(CustomJS(args=dict(source=source), code='''
+    reset_onclick(source);
+    '''))
 
-    # test = Button(label='Teste',button_type='success')
-    # test.js_on_click(CustomJS(args=dict(radio=radio_group,source=source,r=c.glyph.radius), code='''
-    # f(cb_obj,radio,source,r);
-    # '''))
-    # print('raio: ',c.glyph.radius)
-    div, script = components(row(column(contrast,spinner,radio_title,radio_group),\
+    div, script = components(row(column(contrast,spinner,radio_title,radio_group,reset),\
         column(graficos, tabela),
         column(text1,apikey_input,text2,seletor,text3,send_astrometry,text4,salvar)))
     return render_template('plot.html', the_div=div, the_script=script,filename=dirdata['name'])
@@ -378,7 +367,7 @@ def add_radec():
     return make_response(jsonify(req), 200)
 
 
-def solveplateastrometry(key,data,force_upload=False):
+def solveplateastrometry(key,data=None,filepath=None):
     ast = AstrometryNet()
     ast.api_key = key
 
@@ -388,14 +377,13 @@ def solveplateastrometry(key,data,force_upload=False):
     while try_again:
         try:
             if not submission_id:
-                if isinstance(data,str):
-                    wcs_header = ast.solve_from_image(data, force_image_upload=force_upload,
+                if not data:
+                    wcs_header = ast.solve_from_image(filepath, force_image_upload=True,
                                  submission_id=submission_id)
                     print('Com imagem\n',wcs_header)
-                elif isinstance(data,pd.DataFrame):
+                elif isinstance(data,pd.DataFrame) and isinstance(filepath,str):
                     print(data)
-                    filename = data.iloc[0,2]
-                    with fits.open('upfolder/'+filename) as f:
+                    with fits.open(filepath) as f:
                         w, h = f[0].data.shape
                     wcs_header = ast.solve_from_source_list(data['x'], data['y'],
                                  submission_id=submission_id, image_width=w, image_height=h)
@@ -431,7 +419,7 @@ def astrometrysolve(key,dirname,filename):
         # Primeira tentativa apenas com a lista de estrelas
         if len(data):
             print('Tentando com a lista de coordenadas')
-            wcs_header = solveplateastrometry(key,sdata[['x','y','fit']])
+            wcs_header = solveplateastrometry(key,sdata[['x','y']],filepath)
         else:
             print('Tentando com a imagem do photutils')
             wcs_header = solveplateastrometry(key,filepath)
@@ -460,7 +448,7 @@ def create_entry():
 
     req = request.get_json()
     out = pd.DataFrame(req)
-
+    print(out)
     if not out.empty:
         out.to_excel(session['pathname']+'data.xlsx',index=False)
         res = make_response(jsonify({"message": "Arquivo salvo"}), 200)
@@ -511,11 +499,20 @@ def uploaded_file(pathname):
                                'data.xlsx')
 
 
+@app.route('/reducao/<dirname>')
+def reducao(dirname):
+    '''
+    Faz a redução de dados caso exista a tabela com os dados
+    '''
+
+    
+
+
 def main():
-    # port = int(os.environ.get("PORT",5000))
-    # app.run(host="0.0.0.0", port=port)
-    app.run(debug=True)
+    port = int(os.environ.get("PORT",5000))
+    app.run(host="0.0.0.0", port=port)
+    # app.run(debug=True)
 
 
 if __name__ == "__main__":
-   main()
+    main()
