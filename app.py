@@ -390,31 +390,36 @@ def solveplateastrometry(key,data=None,filepath=None):
 
     try_again = True
     submission_id = None
+    wcs_header = {}
 
     while try_again:
         try:
             if not submission_id:
                 if not data:
+                    print("Requisitando com upload da imagem: ", filepath)
                     wcs_header = ast.solve_from_image(filepath, force_image_upload=True,
-                                 submission_id=submission_id)
+                                 submission_id=submission_id, solve_timeout=120)
                     print('Com imagem\n',wcs_header)
                 elif isinstance(data,pd.DataFrame) and isinstance(filepath,str):
                     print(data)
                     with fits.open(filepath) as f:
                         w, h = f[0].data.shape
                     wcs_header = ast.solve_from_source_list(data['x'], data['y'],
-                                 submission_id=submission_id, image_width=w, image_height=h)
+                                 submission_id=submission_id, image_width=w, image_height=h,
+                                 solve_timeout=120)
                     print('Com dados\n',wcs_header)
             else:
                 wcs_header = ast.monitor_submission(submission_id,
                                  solve_timeout=120)
                 print('Buscando algumas vezes\n',wcs_header)
+
         except TimeoutError as e:
             submission_id = e.args[1]
+
         else:
             # got a result, so terminate
             try_again = False
-
+    
     return wcs_header
 
 
@@ -439,12 +444,12 @@ def astrometrysolve(key,dirname,filename):
             wcs_header = solveplateastrometry(key,sdata[['x','y']],filepath)
         else:
             print('Tentando com a imagem do photutils')
-            wcs_header = solveplateastrometry(key,filepath)
+            wcs_header = solveplateastrometry(key,filepath=filepath)
         print('Resultado 1\n', wcs_header)
 
         if not isinstance(wcs_header,fits.Header):
             print('Tentando com upload da imagem')
-            wcs_header = solveplateastrometry(key,filepath,force_upload=True)
+            wcs_header = solveplateastrometry(key,filepath=filepath)
             print('Resultado 2\n', wcs_header)
 
         if isinstance(wcs_header,fits.Header):
