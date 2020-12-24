@@ -10,6 +10,7 @@ import colorcet as cc
 from flask import Flask, flash, render_template, request, redirect, url_for,\
                   send_from_directory, jsonify, make_response, session, g
 import json
+from numpy.lib.function_base import gradient
 from werkzeug.utils import secure_filename
 import os
 
@@ -142,12 +143,13 @@ def plotfits(dirname):
             k = [],
             tipo=[], # se é obj, src ou sky
             banda=[], # o filtro da imagem e arquivo
-            
+            sid=[], # id da estrela copiada
             colors=[] # para colorir de acordo o tipo de objeto
         ))
 
     # Constrói a tabaela de dados que poderá ser usada para designar as posições do objeto, estrela e céu
     tabela = DataTable(source=source,columns=[
+        TableColumn(field='sid',title='sid'),
         TableColumn(field='x',title='x'),
         TableColumn(field='y',title='y'),
         TableColumn(field='ra',title='ra'),
@@ -239,9 +241,15 @@ def plotfits(dirname):
     reset_onclick(source);
     '''))
 
-    div, script = components(row(column(contrast,spinner,radio_title,radio_group,reset),\
+    send = Button(label='Copiar coordenadas', button_type='success')
+    send.js_on_click(CustomJS(args=dict(source=source, ref=seletor, active=graficos), code='''
+    add_data(source,ref,active);
+    '''))
+
+    div, script = components(row(column(contrast,spinner,radio_title,radio_group,reset,send),\
         column(graficos, tabela),
         column(text1,apikey_input,text2,seletor,text3,send_astrometry,text4,salvar)))
+
     return render_template('plot.html', the_div=div, the_script=script,filename=dirdata['name'])
 
 
@@ -263,6 +271,14 @@ def recalc_fluxes():
     r = req['r']
     session.modifeid = True
     session['r'] = r
+
+    # Salva o novo raio
+    print(session['pathname']+'data.json')
+    with open(session['pathname']+'data.json') as f:
+        dirdata = json.load(f)
+    dirdata['r'] = r
+    with open(session['pathname']+'data.json','w') as f:
+        json.dump(dirdata,f)
 
     for banda in data['banda']:
         fname = banda.split(':')[1]
@@ -343,6 +359,7 @@ def add_radec():
     '''
     
     req = request.get_json()
+    print(req)
     fname = req['banda'].split(':')[1]
     img = fits.getdata(session['pathname']+fname)
 
@@ -505,7 +522,24 @@ def reducao(dirname):
     Faz a redução de dados caso exista a tabela com os dados
     '''
 
-    
+    try:
+        data = pd.read_excel(app.config['UPLOAD_FOLDER']+'/%s/data.xlsx' % dirname)
+        with open(app.config['UPLOAD_FOLDER']+'/%s/data.json' % dirname) as f:
+            jdata = json.load(f)
+
+        for fname in jdata['fitsB']:
+            new_data = dict(
+                banda='fitsB:'+fname,
+                tipo = 'srcc',
+                colors = 'yellow'
+            )
+
+
+        # Copiando as estrelas que
+
+    except FileNotFoundError:
+        return 'Arquivo não encontrado, salve a tabela de dados.'
+
 
 
 def main():

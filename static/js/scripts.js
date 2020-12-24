@@ -60,21 +60,25 @@ const COLORS = ['red','yellow','blue'];
 var N = 0;
 
 
-function source_onchange(cb_obj, radio, graficos) {
+function source_onchange(cb_obj, radio=null, graficos=null) {
 
-    const active = graficos.active
-    const banda = graficos.tabs[active].title
     var data = cb_obj.data;
 
     const n = data['x'].length;
     if(n>N) {
-        const labels = radio.labels;
-        if(data['tipo'][n-1]=='na') {
+        if(data['sid'][n-1]=='na') {
+            const active = graficos.active
+            const banda = graficos.tabs[active].title
+            const labels = radio.labels;
             data['tipo'][n-1] = labels[radio.active];
             data['banda'][n-1] = banda;
+            data['colors'][n-1] = COLORS[radio.active];
         }
-        data['colors'][n-1] = COLORS[radio.active];
-        cb_obj.change.emit();
+        // else {
+        //     data['colors'][n-1] = data['colors'][data['sid']];
+        //     data['tipo'][n-1] = data['tipo'][data['sid']];
+        // }
+        // cb_obj.change.emit();
 
         entry = {
             tipo: data['tipo'][n-1],
@@ -87,6 +91,7 @@ function source_onchange(cb_obj, radio, graficos) {
             k: data['k'][n-1],
             banda: data['banda'][n-1]
         }
+        console.log(entry)
         fetch(`${window.origin}/add`, {
             method: "POST",
             credentials: "include",
@@ -184,12 +189,13 @@ function contrast_onchange(cb_obj, tabs, im) {
 }
 
 
+
 const make_entry = (data) => {
     return {
+        sid: [].slice.call(data['sid']),
         banda: data['banda'],
         tipo: data['tipo'],
         colors: data['colors'],
-        
         x: [].slice.call(data['x']),
         y: [].slice.call(data['y']),
         ra: [].slice.call(data['ra']),
@@ -334,8 +340,9 @@ function send_2mass(source) {
 
 
 function reset_onclick(source) {
-    var data = source.data;
+    let data = source.data;
 
+    data['sid']=[];
     data['x'] = [];
     data['y'] = [];
     data['tipo'] = [];
@@ -348,6 +355,82 @@ function reset_onclick(source) {
     data['colors'] = [];
 
     source.change.emit()
+}
+
+
+const add_data = async(source, ref, graficos) => {
+    // Função que irá copiar os dados da imagem de referência
+
+    console.log(ref.value, graficos.active);
+    let data = source.data;
+    let active = graficos.active;
+    let refv = ref.value;
+
+    let n = data['x'].length; // quantidades de linhas existentes na tabela
+
+    // let newData = {
+    //     'sid': [data], // copia o índice do ponto original
+    //     'x': [],
+    //     'y': [],
+    //     'flux': [],
+    //     'tipo': [],
+    //     'banda': [],
+    //     'ra': [],
+    //     'dec': [],
+    //     'j': [],
+    //     'k': [],
+    //     'colors': [],
+    // }
+    // data['sid'] = [].slice.call(data['sid']);
+    // data['banda'] = data['banda'];
+    // data['tipo'] = data['tipo'];
+    // data['colors'] = data['colors'];
+    // data['x'] = [].slice.call(data['x']);
+    // data['y'] = [].slice.call(data['y']);
+    // data['ra'] = [].slice.call(data['ra']);
+    // data['dec'] = [].slice.call(data['dec']);
+    // data['flux'] = [].slice.call(data['flux']);
+    // data['j'] = [].slice.call(data['j']);
+    // data['k'] = [].slice.call(data['k']);
+    let newdata = {
+        'sid': [].slice.call(data['sid']),
+        'banda': data['banda'],
+        'tipo': data['tipo'],
+        'colors': data['colors'],
+        'x': [].slice.call(data['x']),
+        'y': [].slice.call(data['y']),
+        'ra': [].slice.call(data['ra']),
+        'dec': [].slice.call(data['dec']),
+        'flux': [].slice.call(data['flux']),
+        'j': [].slice.call(data['j']),
+        'k': [].slice.call(data['k']),
+    }
+    //let newData = make_entry(data);
+    for(let i=0;i<n;i++) {
+        // console.log('P: ',refv, 'T', data['banda'][i])
+        if(data['banda'][i]===refv && data['tipo'][i]!=='obj') {
+            // await new Promise(r => setTimeout(r,1000));
+            newdata['sid'].push(i); // copia o índice do ponto original
+            newdata['x'].push(data['x'][i]);
+            newdata['y'].push(data['y'][i]);
+            newdata['flux'].push('na');
+            newdata['tipo'].push(data['tipo'][i]);
+            newdata['banda'].push(graficos.tabs[active].title);
+            newdata['ra'].push(data['ra'][i]);
+            newdata['dec'].push(data['dec'][i]);
+            newdata['j'].push(data['j'][i]);
+            newdata['k'].push(data['k'][i]);
+            newdata['colors'].push(data['colors'][i]);
+            source.data = newdata;
+            source_onchange(source);
+        }
+    }
+    // source.data = newdata;
+    //let num = newData['x'].length
+    //console.log(newData);
+    // source.stream(newData);
+    // source.change.emit()
+    console.log('Copiado!')
 }
 
 
