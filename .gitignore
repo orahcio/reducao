@@ -10,3 +10,4 @@ launch.json
 *.corr
 *.xlsx
 data.json
+upfolder/
