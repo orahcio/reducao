@@ -210,7 +210,6 @@ def plotfits(dirname):
     
     # Muda o raio da abertura fotométrica
     spinner = Spinner(title="Raio", low=1, high=40, step=0.5, value=r, width=80)
-    spinner.js_link('value', c.glyph, 'radius')
     spinner.js_on_change('value', CustomJS(args=dict(source=source, tabs=graficos.tabs), code='''
     radius_onchange(cb_obj,source,tabs);
     '''))
