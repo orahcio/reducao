@@ -74,11 +74,7 @@ function source_onchange(cb_obj, radio=null, graficos=null) {
             data['banda'][n-1] = banda;
             data['colors'][n-1] = COLORS[radio.active];
         }
-        // else {
-        //     data['colors'][n-1] = data['colors'][data['sid']];
-        //     data['tipo'][n-1] = data['tipo'][data['sid']];
-        // }
-        // cb_obj.change.emit();
+
 
         entry = {
             tipo: data['tipo'][n-1],
@@ -368,30 +364,6 @@ const add_data = async(source, ref, graficos) => {
 
     let n = data['x'].length; // quantidades de linhas existentes na tabela
 
-    // let newData = {
-    //     'sid': [data], // copia o índice do ponto original
-    //     'x': [],
-    //     'y': [],
-    //     'flux': [],
-    //     'tipo': [],
-    //     'banda': [],
-    //     'ra': [],
-    //     'dec': [],
-    //     'j': [],
-    //     'k': [],
-    //     'colors': [],
-    // }
-    // data['sid'] = [].slice.call(data['sid']);
-    // data['banda'] = data['banda'];
-    // data['tipo'] = data['tipo'];
-    // data['colors'] = data['colors'];
-    // data['x'] = [].slice.call(data['x']);
-    // data['y'] = [].slice.call(data['y']);
-    // data['ra'] = [].slice.call(data['ra']);
-    // data['dec'] = [].slice.call(data['dec']);
-    // data['flux'] = [].slice.call(data['flux']);
-    // data['j'] = [].slice.call(data['j']);
-    // data['k'] = [].slice.call(data['k']);
     let newdata = {
         'sid': [].slice.call(data['sid']),
         'banda': data['banda'],
@@ -425,11 +397,7 @@ const add_data = async(source, ref, graficos) => {
             source_onchange(source);
         }
     }
-    // source.data = newdata;
-    //let num = newData['x'].length
-    //console.log(newData);
-    // source.stream(newData);
-    // source.change.emit()
+
     console.log('Copiado!')
 }
 

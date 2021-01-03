@@ -77,13 +77,13 @@ def upload_file():
         if not os.path.exists(pathname):
             os.mkdir(pathname)
 
-        # Definindo dados da análise para serem salvos junto com os arquivos
+        # Definindo table da análise para serem salvos junto com os arquivos
         dirdata = dict(
             name = request.form.get('refname'),
             r = 8
         )
 
-        # Upload de arquivos e salvando dados da sessão para serem salvosjuntos
+        # Upload de arquivos e salvando table da sessão para serem salvosjuntos
         for banda in request.files.keys():
             dirdata[banda] = []
             for ffit in request.files.getlist(banda):
@@ -144,21 +144,21 @@ def plotfits(dirname):
             tipo=[], # se é obj, src ou sky
             banda=[], # o filtro da imagem e arquivo
             sid=[], # id da estrela copiada
-            colors=[] # para colorir de acordo o tipo de objeto
+            colors=[], # para colorir de acordo o tipo de objeto
         ))
 
-    # Constrói a tabaela de dados que poderá ser usada para designar as posições do objeto, estrela e céu
+    # Constrói a tabaela de table que poderá ser usada para designar as posições do objeto, estrela e céu
     tabela = DataTable(source=source,columns=[
-        TableColumn(field='sid',title='sid'),
         TableColumn(field='x',title='x'),
         TableColumn(field='y',title='y'),
         TableColumn(field='ra',title='ra'),
         TableColumn(field='dec',title='dec'),
-        TableColumn(field='flux',title='flux'),
         TableColumn(field='j',title='j'),
         TableColumn(field='k',title='k'),
+        TableColumn(field='flux',title='flux'),
         TableColumn(field='tipo',title='tipo'),
-        TableColumn(field='banda',title='banda')
+        TableColumn(field='banda',title='banda'),
+        TableColumn(field='sid',title='sid')
     ], editable=True)
     
 
@@ -203,7 +203,7 @@ def plotfits(dirname):
     LABELS = ['obj','src','sky']
     radio_group = RadioGroup(labels=LABELS, active=0)
 
-    # Evento de mudança da tabela de dados, para inserir dados padrão nas colunas inalteradas
+    # Evento de mudança da tabela de table, para inserir table padrão nas colunas inalteradas
     source.js_on_change('data', CustomJS(args=dict(radio=radio_group, graficos=graficos), code='''
     source_onchange(cb_obj, radio, graficos);
     '''))
@@ -229,7 +229,7 @@ def plotfits(dirname):
     '''))
 
     # o Botão de salvar irá enviar um json para o servidor que irá ler e fazer os procedimentos posteriores
-    text4 = Div(text='4. Salve a tabela de dados clicando abaixo para download')
+    text4 = Div(text='4. Salve a tabela de table clicando em salvar.')
     salvar = Button(label='Salvar tabela', button_type="success")
     salvar.js_on_click(CustomJS(args=dict(source=source), code='''
     salvar_onclick(source);
@@ -240,14 +240,14 @@ def plotfits(dirname):
     reset_onclick(source);
     '''))
 
-    send = Button(label='Copiar coordenadas', button_type='success')
-    send.js_on_click(CustomJS(args=dict(source=source, ref=seletor, active=graficos), code='''
+    copiar = Button(label='Copiar coordenadas', button_type='success')
+    copiar.js_on_click(CustomJS(args=dict(source=source, ref=seletor, active=graficos), code='''
     add_data(source,ref,active);
     '''))
 
-    div, script = components(row(column(contrast,spinner,radio_title,radio_group,reset,send),\
-        column(graficos, tabela),
-        column(text1,apikey_input,text2,seletor,text3,send_astrometry,text4,salvar)))
+    div, script = components(row(column(contrast,spinner,radio_title,radio_group),\
+        column(row(reset,copiar,salvar), graficos, tabela, sizing_mode='stretch_both'),
+        column(text1,apikey_input,text2,seletor,text3,send_astrometry,text4)))
 
     return render_template('plot.html', the_div=div, the_script=script,filename=dirdata['name'])
 
@@ -316,9 +316,8 @@ def centralizar(img, banda, cx, cy):
             d = np.sqrt((x-cx)**2+(y-cy)**2)
             if d<dmin:
                 dmin = d
-                idx = i
-        cx = cr[idx]['xcentroid']
-        cy = cr[idx]['ycentroid']
+                cx = cr[i]['xcentroid']
+                cy = cr[i]['ycentroid']
 
     return cx,cy
 
@@ -406,7 +405,7 @@ def solveplateastrometry(key,data=None,filepath=None):
                     wcs_header = ast.solve_from_source_list(data['x'], data['y'],
                                  submission_id=submission_id, image_width=w, image_height=h,
                                  solve_timeout=120)
-                    print('Com dados\n',wcs_header)
+                    print('Com table\n',wcs_header)
             else:
                 wcs_header = ast.monitor_submission(submission_id,
                                  solve_timeout=120)
@@ -428,7 +427,7 @@ def astrometrysolve(key,dirname,filename):
     Essa função faz a requisição para o astrometry.net,
     tem espaço para usar o método get, possivelmente implementarei
     para fazer forçando o upload se a solução não existir e retornar
-    á página do plot de dados.
+    á página do plot de table.
     '''
     if request.method=='POST':
 
@@ -464,7 +463,7 @@ def astrometrysolve(key,dirname,filename):
 @app.route("/resultado", methods=["POST"])
 def create_entry():
     '''
-    Rota para receber tabela de dados a partir de um envio do navegador
+    Rota para receber tabela de table a partir de um envio do navegador
     '''
 
     req = request.get_json()
@@ -523,26 +522,82 @@ def uploaded_file(pathname):
 @app.route('/reducao/<dirname>')
 def reducao(dirname):
     '''
-    Faz a redução de dados caso exista a tabela com os dados
+    Faz a redução de table caso exista a tabela com os table
     '''
+    filepath = app.config['UPLOAD_FOLDER']+'/%s/data.xlsx' % dirname
+    output = app.config['UPLOAD_FOLDER']+'/%s/result.xlsx' % dirname
+    filedata = app.config['UPLOAD_FOLDER']+'/%s/data.json' % dirname
+    cols = ['b-v', 'v-r', 'V-v']
 
     try:
-        data = pd.read_excel(app.config['UPLOAD_FOLDER']+'/%s/data.xlsx' % dirname)
-        with open(app.config['UPLOAD_FOLDER']+'/%s/data.json' % dirname) as f:
-            jdata = json.load(f)
+        with open(filedata) as f:
+            datadir = json.load(f)
 
-        for fname in jdata['fitsB']:
-            new_data = dict(
-                banda='fitsB:'+fname,
-                tipo = 'srcc',
-                colors = 'yellow'
-            )
+        table = pd.read_excel(filepath)
+        table['mag'] = 0 # criando a coluna de magnitudes
+
+        # Selecionando estrelas dentro do intervalo
+        ids = table['tipo']=='src' # índices pra selecionar estrelas
+        idx = (table['tipo']!='src')|((-0.1<table['j'][ids]-table['k'][ids])&(table['j'][ids]-table['k'][ids]<1.0))
+        table = table[idx]
+        ids = table['tipo']=='src' # recalcula o ids
+        ido = table['tipo']=='obj' # índices pra selecionar objetos
+        
+        # Calculando as magnitudes
+        for e in set(table['banda']):
+            med = np.median(table[(table['banda']==e)&(table['tipo']=='sky')]['flux'])
+            idx = (table['banda']==e)&(table['tipo']!='sky')
+            table.loc[idx,'mag'] = -2.5*np.log10(table[idx]['flux'].values-med)
 
 
+        # Calculando índices das estrelas
+        INDICES = {}
+        # Índices de catálogo
+        idref = (table['banda'] == 'fitsR:'+datadir['fitsR'][-1]) & ids
+        j = table['j'][idref]
+        INDICES['j'] = j.values
+        k = table['k'][idref]
+        INDICES['k'] = k.values
+        j_k = j-k
+        INDICES['j-k'] = j_k.values
+        B_V = 0.2807*j_k**3 - 0.4535*j_k**2 + 1.7006*j_k + 0.0484
+        INDICES['B-V'] = B_V.values
+        V_R = 0.3458*j_k**3 - 0.5401*j_k**2 + 1.0038*j_k + 0.0451
+        INDICES['V-R'] = V_R.values
+        V = 1.4688*j_k**3 - 2.325*j_k**2 + 3.5143*j_k + 0.1496 + j
+        INDICES['V'] = V.values
+
+        # Construindo tabela lado a lado
+
+        # Índices instrumentais
+        for i in range(len(datadir['fitsR'])):
+            # b-v instrumental
+            bstr = 'fitsB:'+datadir['fitsB'][i]
+            vstr = 'fitsV:'+datadir['fitsV'][i]
+            idb =  ids & (table['banda'] == bstr)
+            idv = ids & (table['banda'] == vstr)
+            b = table['mag'][idb].values; v = table['mag'][idv].values
+            b_v = b-v
+            INDICES['b_v'+str(i)] = b_v
+
+            # v-r instrumental
+            idr = (table['banda'] == 'fitsR:'+datadir['fitsR'][i]) & ids
+            r = table['mag'][idr].values
+            v_r = v-r 
+            INDICES['v_r'+str(i)] = v_r
+
+            # V-v instrumental
+            V_v = V-v
+            INDICES['V_v'+str(i)] = V_v
+
+        outtable = pd.DataFrame(INDICES)
+        outtable.to_excel(output)
+
+        return 'Resultado na tabela'
         # Copiando as estrelas que
 
     except FileNotFoundError:
-        return 'Arquivo não encontrado, salve a tabela de dados.'
+        return 'Arquivo não encontrado, salve a tabela de table.'
 
 
 
