@@ -232,11 +232,11 @@ function salvar_onclick(source) {
     });
 
     // Fazer download
-    url = `${window.origin}/download/${get_name().replace(/(fits|fit)/,'xlsx')}`
+    url = `${window.origin}/download/${window.location.pathname.split('/')[2]}/data.xlsx`
     // fetch(url)
     console.log(url)
     var link = document.createElement("a");
-    link.download = get_name().replace(/(fits|fit)/,'xlsx');
+    link.download = `${window.location.pathname.split('/')[2]}.xlsx`;
     link.href = url;
     link.click();
 

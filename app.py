@@ -28,6 +28,8 @@ from astropy.stats import sigma_clipped_stats
 from photutils import DAOStarFinder
 from photutils import CircularAperture, aperture_photometry
 
+import statsmodels.formula.api as smf
+
 import pandas as pd
 
 import numpy as np
@@ -513,10 +515,27 @@ def search_2MASS():
     return res
 
 
-@app.route('/download/<pathname>')
-def uploaded_file(pathname):
+@app.route('/download/<pathname>/<filename>')
+def uploaded_file(pathname,filename):
     return send_from_directory(app.config['UPLOAD_FOLDER']+'/'+pathname,
-                               'data.xlsx')
+                               filename)
+
+
+def getcoef(data, q=0.5):
+    '''
+    Pega o coeficiente angular da regressão
+    '''
+    
+    data.columns = ['income', 'depend']
+    # por algum motivo a tabela não estava fazendo a regreção corretamente, estava entendendo o eixo
+    # das variáveis independentes como vários eixos e não apenas um eixo
+    table = {'income': data['income'].values.tolist(), 'depend': data['depend'].values.tolist()}
+
+    mod = smf.quantreg('depend ~ income', table)
+    res = mod.fit(q=q)
+
+    return res.params['income']
+
 
 
 @app.route('/reducao/<dirname>')
@@ -527,78 +546,150 @@ def reducao(dirname):
     filepath = app.config['UPLOAD_FOLDER']+'/%s/data.xlsx' % dirname
     output = app.config['UPLOAD_FOLDER']+'/%s/result.xlsx' % dirname
     filedata = app.config['UPLOAD_FOLDER']+'/%s/data.json' % dirname
-    cols = ['b-v', 'v-r', 'V-v']
+    
+    mag = lambda x: -2.5*np.log10(x)
 
-    try:
-        with open(filedata) as f:
-            datadir = json.load(f)
+    # try:
+    with open(filedata) as f:
+        datadir = json.load(f)
+    print('abriu data.json')
+    table = pd.read_excel(filepath)
+    table['mag'] = 0 # criando a coluna de magnitudes
 
-        table = pd.read_excel(filepath)
-        table['mag'] = 0 # criando a coluna de magnitudes
-
-        # Selecionando estrelas dentro do intervalo
-        ids = table['tipo']=='src' # índices pra selecionar estrelas
-        idx = (table['tipo']!='src')|((-0.1<table['j'][ids]-table['k'][ids])&(table['j'][ids]-table['k'][ids]<1.0))
-        table = table[idx]
-        ids = table['tipo']=='src' # recalcula o ids
-        ido = table['tipo']=='obj' # índices pra selecionar objetos
+    # Selecionando estrelas dentro do intervalo
+    ids = table['tipo']=='src' # índices pra selecionar estrelas
+    idx = (table['tipo']!='src')|((-0.1<table['j'][ids]-table['k'][ids])&(table['j'][ids]-table['k'][ids]<1.0))
+    table = table[idx]
+    ids = table['tipo']=='src' # recalcula o ids
+    ido = table['tipo']=='obj' # índices pra selecionar objetos
         
-        # Calculando as magnitudes
-        for e in set(table['banda']):
-            med = np.median(table[(table['banda']==e)&(table['tipo']=='sky')]['flux'])
-            idx = (table['banda']==e)&(table['tipo']!='sky')
-            table.loc[idx,'mag'] = -2.5*np.log10(table[idx]['flux'].values-med)
+    # Calculando as magnitudes
+    for e in set(table['banda']):
+        med = np.median(table[(table['banda']==e)&(table['tipo']=='sky')]['flux'])
+        idx = (table['banda']==e)&(table['tipo']!='sky')
+        table.loc[idx,'mag'] = mag(table[idx]['flux'].values-med)
 
 
-        # Calculando índices das estrelas
-        INDICES = {}
-        # Índices de catálogo
-        idref = (table['banda'] == 'fitsR:'+datadir['fitsR'][-1]) & ids
-        j = table['j'][idref]
-        INDICES['j'] = j.values
-        k = table['k'][idref]
-        INDICES['k'] = k.values
-        j_k = j-k
-        INDICES['j-k'] = j_k.values
-        B_V = 0.2807*j_k**3 - 0.4535*j_k**2 + 1.7006*j_k + 0.0484
-        INDICES['B-V'] = B_V.values
-        V_R = 0.3458*j_k**3 - 0.5401*j_k**2 + 1.0038*j_k + 0.0451
-        INDICES['V-R'] = V_R.values
-        V = 1.4688*j_k**3 - 2.325*j_k**2 + 3.5143*j_k + 0.1496 + j
-        INDICES['V'] = V.values
+    # Calculando índices das estrelas
+    INDICES = {}
+    INDICEO = {}
+    # Índices de catálogo
+    idref = (table['banda'] == 'fitsR:'+datadir['fitsR'][-1]) & ids
+    j = table['j'][idref]
+    INDICES['j'] = j.values
+    k = table['k'][idref]
+    INDICES['k'] = k.values
+    j_k = j-k
+    INDICES['j-k'] = j_k.values
+    B_V = 0.2807*j_k**3 - 0.4535*j_k**2 + 1.7006*j_k + 0.0484
+    INDICES['B-V'] = B_V.values
+    V_R = 0.3458*j_k**3 - 0.5401*j_k**2 + 1.0038*j_k + 0.0451
+    INDICES['V-R'] = V_R.values
+    V = 1.4688*j_k**3 - 2.325*j_k**2 + 3.5143*j_k + 0.1496 + j
+    INDICES['V'] = V.values
 
-        # Construindo tabela lado a lado
+    # Construindo tabela lado a lado
+
+    for i in range(len(datadir['fitsR'])):
+        bstr = 'fitsB:'+datadir['fitsB'][i]
+        vstr = 'fitsV:'+datadir['fitsV'][i]
+        rstr = 'fitsR:'+datadir['fitsR'][i]
 
         # Índices instrumentais
-        for i in range(len(datadir['fitsR'])):
-            # b-v instrumental
-            bstr = 'fitsB:'+datadir['fitsB'][i]
-            vstr = 'fitsV:'+datadir['fitsV'][i]
-            idb =  ids & (table['banda'] == bstr)
-            idv = ids & (table['banda'] == vstr)
-            b = table['mag'][idb].values; v = table['mag'][idv].values
-            b_v = b-v
-            INDICES['b_v'+str(i)] = b_v
+        idb =  ids & (table['banda'] == bstr)
+        idv = ids & (table['banda'] == vstr)
+        idr = (table['banda'] == rstr) & ids
+        b = table['mag'][idb].values
+        v = table['mag'][idv].values
+        r = table['mag'][idr].values
+        v_r = v-r 
+        b_v = b-v
 
-            # v-r instrumental
-            idr = (table['banda'] == 'fitsR:'+datadir['fitsR'][i]) & ids
-            r = table['mag'][idr].values
-            v_r = v-r 
-            INDICES['v_r'+str(i)] = v_r
+        # b, v e r instrumentais
+        INDICES['b'+str(i)] = b
+        INDICES['v'+str(i)] = v
+        INDICES['r'+str(i)] = r
+        # b-v instrumental
+        INDICES['b-v_'+str(i)] = b_v
+        # v-r instrumental
+        INDICES['v-r_'+str(i)] = v_r
+        # V-v instrumental
+        V_v = V-v
+        INDICES['V-v_'+str(i)] = V_v
 
-            # V-v instrumental
-            V_v = V-v
-            INDICES['V_v'+str(i)] = V_v
+        # Índices de objeto
+        idb =  ido & (table['banda'] == bstr)
+        idv = ido & (table['banda'] == vstr)
+        idr = (table['banda'] == rstr) & ido
+        bo = table['mag'][idb].values
+        vo = table['mag'][idv].values
+        ro = table['mag'][idr].values
+        v_ro = vo-ro 
+        b_vo = bo-vo
 
-        outtable = pd.DataFrame(INDICES)
-        outtable.to_excel(output)
+        # b, v e r instrumentais do objeto
+        INDICEO['b'+str(i)] = bo
+        INDICEO['v'+str(i)] = vo
+        INDICEO['r'+str(i)] = ro
+        # b-v instrumental
+        INDICEO['b-v_'+str(i)] = b_vo
+        # v-r instrumental
+        INDICEO['v-r_'+str(i)] = v_ro
 
-        return 'Resultado na tabela'
-        # Copiando as estrelas que
+        S = pd.DataFrame(INDICES)
+        S.to_excel(output)
+        O = pd.DataFrame(INDICEO)
+        O.to_excel('.'+output.strip('\.xlsx')+'_obj.xlsx')
 
-    except FileNotFoundError:
-        return 'Arquivo não encontrado, salve a tabela de table.'
+    # pegando coeficientes
+    Tvr = []; Tv = []; Tbv = []
+    for i in range(len(datadir['fitsR'])):
+        # Tvr é o coeficiente inverso de v-r vs. V-R
+        Tvr.append(1./getcoef(S[['V-R','v-r_'+str(i)]]))
+        # Tv é o coeficiente de V-v vs. V-R
+        Tv.append(getcoef(S[['V-R','V-v_'+str(i)]]))
+        # Tbv é o inverso do coeficiente de b-v vs. B-V
+        Tbv.append(1./getcoef(S[['B-V','b-v_'+str(i)]]))
 
+    coef = pd.DataFrame(dict(
+        Tvr = Tvr,
+        Tv = Tv,
+        Tbv = Tbv
+    ))
+    coef.to_excel('.'+output.strip('\.xlsx')+'_coef.xlsx')
+
+    # Colcular os índices do objeto
+    OBJETO = {}
+    for i in range(len(datadir['fitsR'])):
+        v_r = S['V-R'].values + Tvr[i]*(O['v-r_'+str(i)].values-S['v-r_'+str(i)].values)
+        v = S['V'].values + S['V-v_'+str(i)].values + Tv[i]*(O['v-r_'+str(i)].values-v_r)
+        r = v - v_r
+        b = v + S['B-V'].values + Tbv[i]*(O['b-v_'+str(i)].values-S['b-v_'+str(i)].values)
+
+        OBJETO['v-r_'+str(i)] = v_r.tolist()
+        OBJETO['v_'+str(i)] = v.tolist()
+        OBJETO['r_'+str(i)] = r.tolist()
+        OBJETO['b_'+str(i)] = b.tolist()
+
+    table = pd.DataFrame(OBJETO)
+    print(table)
+    table.to_excel('.'+output.strip('\.xlsx')+'_objstar.xlsx')
+
+    url1 = request.url_root+'download/'+dirname+'/result.xlsx'
+    url2 = request.url_root+'download/'+dirname+'/result_obj.xlsx'
+    url3 = request.url_root+'download/'+dirname+'/result_coef.xlsx'
+    url4 = request.url_root+'download/'+dirname+'/result_objstar.xlsx'
+
+    return '''Resultados:<br>
+    - <a href="%s">tabela de estrelas</a>;<br>
+    - <a href="%s">tabela de índices do objeto</a>;<br>
+    - <a href="%s">tabela de coeficientes</a>;<br>
+    - <a href="%s">tabela de índices do objeto com as estrelas</a>.
+    ''' % (url1,url2,url3,url4)
+    # Copiando as estrelas que
+
+    #except FileNotFoundError:
+    #    return 'Arquivo não encontrado, salve a tabela.'
 
 
 def main():
