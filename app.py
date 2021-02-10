@@ -661,15 +661,13 @@ def reducao(dirname):
     # Colcular os índices do objeto
     OBJETO = {}
     for i in range(len(datadir['fitsR'])):
-        v_r = S['V-R'].values + Tvr[i]*(O['v-r_'+str(i)].values-S['v-r_'+str(i)].values)
-        v = S['V'].values + S['V-v_'+str(i)].values + Tv[i]*(O['v-r_'+str(i)].values-v_r)
-        r = v - v_r
-        b = v + S['B-V'].values + Tbv[i]*(O['b-v_'+str(i)].values-S['b-v_'+str(i)].values)
+        b_v = S['B-V'].values + Tbv[i]*(O['b-v_'+str(i)].values - S['b-v_'+str(i)].values)
+        v_r = S['V-R'].values + Tvr[i]*(O['v-r_'+str(i)].values - S['v-r_'+str(i)].values)
+        v   = O['v'+str(i)].values + S['V-v_'+str(i)] + Tv[i]*(v_r - S['V-R'].values)
 
+        OBJETO['b-v_'+str(i)] = b_v.tolist()
         OBJETO['v-r_'+str(i)] = v_r.tolist()
         OBJETO['v_'+str(i)] = v.tolist()
-        OBJETO['r_'+str(i)] = r.tolist()
-        OBJETO['b_'+str(i)] = b.tolist()
 
     table = pd.DataFrame(OBJETO)
     print(table)
