@@ -17,6 +17,7 @@ import os
 from astropy.io import fits
 from astropy.visualization import HistEqStretch, ContrastBiasStretch
 from astropy.table import Table
+from astropy.time import Time
 
 from astropy.coordinates import SkyCoord, match_coordinates_sky
 from astropy.wcs import WCS
@@ -108,6 +109,7 @@ def plotfits(dirname):
     session.modifeid = True
     session['pathname'] = app.config['UPLOAD_FOLDER']+'/'+dirname+'/'
     session['stats'] = {}
+    session['time'] = {} # pegar a data para converter em juliana e inserir nas análises
 
     with open(session['pathname']+'data.json') as f:
         dirdata = json.load(f)
@@ -124,6 +126,8 @@ def plotfits(dirname):
             if not celestial:
                 celestial = WCS(header).has_celestial
                 session['wcs'] = session['pathname']+fname
+                
+            session['date'][fil+':'+fname] = Time(fits.getdata('DATE-OBS', header=True)).jd # a data de observação de cada imagem
 
     # Abrindo coordenadas se salvas
     try:
@@ -669,9 +673,17 @@ def reducao(dirname):
         OBJETO['v-r_'+str(i)] = v_r.tolist()
         OBJETO['v_'+str(i)] = v.tolist()
 
-    table = pd.DataFrame(OBJETO)
-    print(table)
-    table.to_excel('.'+output.strip('\.xlsx')+'_objstar.xlsx')
+    TEMPO = {}
+    for fil in BANDAS:
+        for fname in datadir[fil]:
+            TEMPO[fil + ':' + fname] = session['date'][fil + ':' + fname]
+
+    with pd.ExcelWriter('.'+output.strip('\.xlsx')+'_objstar.xlsx') as writer:
+        table = pd.DataFrame(OBJETO)
+        print(table)
+        table.to_excel(writer)
+        table = pd.DataFrame(TEMPO)
+        table.to_excel(writer,startrow=len(v.tolist()))
 
     url1 = request.url_root+'download/'+dirname+'/result.xlsx'
     url2 = request.url_root+'download/'+dirname+'/result_obj.xlsx'
