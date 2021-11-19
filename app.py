@@ -109,7 +109,7 @@ def plotfits(dirname):
     session.modifeid = True
     session['pathname'] = app.config['UPLOAD_FOLDER']+'/'+dirname+'/'
     session['stats'] = {}
-    session['time'] = {} # pegar a data para converter em juliana e inserir nas análises
+    session['date'] = {} # pegar a data para converter em juliana e inserir nas análises
 
     with open(session['pathname']+'data.json') as f:
         dirdata = json.load(f)
