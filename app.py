@@ -682,6 +682,7 @@ def reducao(dirname):
         table = pd.DataFrame(OBJETO)
         print(table)
         table.to_excel(writer)
+        print(table)
         table = pd.DataFrame(TEMPO)
         table.to_excel(writer,startrow=len(v.tolist()))
 
