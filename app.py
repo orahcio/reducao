@@ -127,7 +127,7 @@ def plotfits(dirname):
                 celestial = WCS(header).has_celestial
                 session['wcs'] = session['pathname']+fname
                 
-            session['date'][fil+':'+fname] = Time(fits.getdata('DATE-OBS', header=True)).jd # a data de observação de cada imagem
+            session['date'][fil+':'+fname] = Time(header['DATE-OBS']).jd # a data de observação de cada imagem
 
     # Abrindo coordenadas se salvas
     try:
