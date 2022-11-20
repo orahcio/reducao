@@ -34,7 +34,7 @@ Seleciona na primeira coluna o tipo _src_ e clica nas fontes de luz que serão u
 
 Uma vez escolhidas as coordenadas de cada fonte de luz e céu é possível reproduzir essas mesmas coordenadas nas demais figuras clicando na aba desejada e depois no botão _Copiar coordenadas_ acima da imagem, isso agiliza bastante o trabalho.
 
-**Atenção!** Uma vez escolhidas todas as coordenadas em todas a imagens revise a tabela para verificar se os fluxos (coluna _flux_) foram todos calculados, caso exista valores _na_ basta escolher outro tamanho de abertura fotométrica na primeira coluna e depois voltar ao tamanho desejado, isso ativa o evento que recalcula os fluxos em todas as aberturas selecionadas nas imagens.
+**Atenção!** Uma vez escolhidas todas as coordenadas em todas a imagens revise a tabela para verificar se os fluxos (coluna _flux_) foram todos calculados, caso exista valores "_na_" basta escolher outro tamanho de abertura fotométrica na primeira coluna e depois voltar ao tamanho desejado, isso ativa o evento que recalcula os fluxos em todas as aberturas selecionadas nas imagens.
 
 ### Finalizando a redução
 
