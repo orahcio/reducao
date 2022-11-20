@@ -107,6 +107,7 @@ def upload_file():
 def plotfits(dirname):
     
     session.modifeid = True
+    session.samesite = 'None'
     session['pathname'] = app.config['UPLOAD_FOLDER']+'/'+dirname+'/'
     session['stats'] = {}
     session['date'] = {} # pegar a data para converter em juliana e inserir nas análises
