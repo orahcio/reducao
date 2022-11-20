@@ -38,7 +38,7 @@ Uma vez escolhidas as coordenadas de cada fonte de luz e céu é possível repro
 
 ### Finalizando a redução
 
-Apóes todos os passos acima será necessário clicar no botão _Salvar tabela_, isso irá fazer o download de uma arquivo `.xlsx` com os cálculos de fluxos e algumas outras informações.
+Após todos os passos acima será necessário clicar no botão _Salvar tabela_, isso irá fazer o download de uma arquivo `.xlsx` com os cálculos de fluxos e algumas outras informações.
 
 A redução do objeto termina se fizermos a requisição manualmente, substituindo o palavra `plot` por `reducao` na barra de endereços do navegador, a saida será links para downloads das tabelas com os valores dos índices de cor do objeto e coeficientes de conversão ajustados para obter tais índices, bem como a informação da data juliana da imagem (obtida diretamento do cabeçalho do `.fits` claro).
 
