@@ -572,7 +572,7 @@ def reducao(dirname):
     for e in set(table['banda']):
         med = np.median(table[(table['banda']==e)&(table['tipo']=='sky')]['flux'])
         idx = (table['banda']==e)&(table['tipo']!='sky')
-        table.loc[idx,'mag'] = mag(table[idx]['flux'].values-med)
+        table.loc[idx,'mag'] = mag(table.loc[idx, 'flux'].values-med)
 
 
     # Calculando índices das estrelas
@@ -675,17 +675,17 @@ def reducao(dirname):
         OBJETO['v_'+str(i)] = v.tolist()
 
     TEMPO = {}
-    for fil in BANDAS:
-        for fname in datadir[fil]:
-            TEMPO[fil + ':' + fname] = session['date'][fil + ':' + fname]
+    for i in session['date'].keys():
+        TEMPO[i] = session['date'][i]
+    print(TEMPO)
+
+    table = pd.DataFrame(OBJETO)
+    juliantable = pd.DataFrame(TEMPO, index=[0])
 
     with pd.ExcelWriter('.'+output.strip('\.xlsx')+'_objstar.xlsx') as writer:
-        table = pd.DataFrame(OBJETO)
         print(table)
         table.to_excel(writer)
-        print(table)
-        table = pd.DataFrame(TEMPO)
-        table.to_excel(writer,startrow=len(v.tolist()))
+        juliantable.to_excel(writer,startrow=len(v.tolist()))
 
     url1 = request.url_root+'download/'+dirname+'/result.xlsx'
     url2 = request.url_root+'download/'+dirname+'/result_obj.xlsx'
