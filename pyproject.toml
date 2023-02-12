@@ -1,0 +1,25 @@
+[tool.poetry]
+name = "reducao"
+version = "0.1.0"
+description = ""
+authors = ["orahcio <orahcio@gmail.com>"]
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "^3.10"
+bokeh = "^3.0.3"
+colorcet = "^3.0.1"
+flask = "^2.2.2"
+numpy = "^1.24.2"
+werkzeug = "^2.2.2"
+astropy = "^5.2.1"
+astroquery = "^0.4.6"
+statsmodels = "^0.13.5"
+pandas = "^1.5.3"
+gunicorn = "^20.1.0"
+photutils = "^1.6.0"
+
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
