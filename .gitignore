@@ -1,5 +1,9 @@
 venv/
+.venv
+_build
 .directory
+.direnv
+.envrc
 .python-version
 *.pyc
 launch.json
