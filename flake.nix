@@ -13,26 +13,38 @@
         inherit system;
       };
     in {
-      packages.fhs-environment = pkgs.buildFHSUserEnv {
-        name = "myEnv";
-        targetPkgs = pkgs: with pkgs; [
-          python3
-          poetry
-        ];
-        runScript = "bash";
-      };
-
-      devShell = pkgs.mkShell {
-        buildInputs = with pkgs; [
-          self.packages.${system}.fhs-environment
+      devShell = pkgs.mkShell rec {
+        venvDir = "./.venv";
+        buildInputs = with pkgs.python3Packages; [
+          venvShellHook
+          bokeh
+          colorcet
+          flask
+          numpy
+          werkzeug
+          astropy
+          astroquery
+          statsmodels
+          pandas
+          gunicorn
+          #poetry
+          pkgs.stdenv.cc.cc
+          pkgs.zlib
+          #lib
+          #libGL
+          #libGLU
+          #xorg.libX11
         ];
         shellHook = ''
-          # export PIP_PREFIX=$(pwd)/_build/pip_packages #Dir where built packages are stored
-          # export PYTHONPATH="$PIP_PREFIX/${pkgs.python3.sitePackages}:$PYTHONPATH"
-          # export PATH="$PIP_PREFIX/bin:$PATH"
-          # unset SOURCE_DATE_EPOCH
-          # source .venv/bin/activate
-          exec myEnv
+          # for PyTorch
+          export LD_LIBRARY_PATH=${pkgs.stdenv.cc.cc.lib}/lib
+
+          # for Numpy
+          export LD_LIBRARY_PATH=${pkgs.zlib}/lib:$LD_LIBRARY_PATH
+
+        #   # GL libraries (for gym environment rendering)
+        #   export LD_LIBRARY_PATH=${pkgs.libGL}/lib:$LD_LIBRARY_PATH
+        #   export LD_LIBRARY_PATH=${pkgs.libGLU}/lib:$LD_LIBRARY_PATH
         '';
       };
     });
