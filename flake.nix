@@ -12,28 +12,20 @@
       pkgs = import nixpkgs {
         inherit system;
       };
-      my_astroquery = pkgs.python311Packages.buildPythonPackage rec {
-        pname = "astroquery";
-        version = "0.4.7.dev7761";
-        src = pkgs.python311Packages.fetchPypi {
-          inherit pname version;
-          sha256 = "7f66e39f0d9e22c0b7bd355ae74218797d87eab9d7236f2fcb1537ee5da7ceda";
-        };
-        propagatedbuildInputs = with pkgs.python311Packages;[
+      my_photutils = pkgs.python311Packages.buildPythonPackage rec {
+        propagatedBuildInputs = with pkgs.python311Packages;[
           setuptools
-        ];
-        buildInputs = with pkgs.python311Packages;[
+          numpy
           astropy
-          pyvo
-          html5lib
-          beautifulsoup4
-          keyring
-          pytest-astropy
-          pytest
-          pillow
-          matplotlib
         ];
-        doCheck = false;
+        pname = "photutils";
+        version = "1.8.0";
+        format = "wheel";
+        url = "https://files.pythonhosted.org/packages/42/15/c9a6126eda18d7e3f75da6f8302619f2d83dadb2f38c18e1fb221f606bf9/photutils-1.8.0-cp311-cp311-manylinux_2_5_x86_64.manylinux1_x86_64.manylinux_2_17_x86_64.manylinux2014_x86_64.whl";
+        src = pkgs.fetchurl { # pkgs.python311Packages.fetchPypi {
+          inherit url; # pname version;
+          sha256 = "6ce5ff0c03c4c426671da4a6a738279682f1dc2a352c77006561debc403955b7";
+        };
       };
     in {
       devShell = pkgs.mkShell rec {
@@ -46,9 +38,8 @@
           numpy
           werkzeug
           astropy
-          # keyring
-          # beautifulsoup4
           (astroquery.overridePythonAttrs (_: { doCheck = false; }))
+          my_photutils
           statsmodels
           gunicorn
           pandas
@@ -82,8 +73,6 @@
 
           unset SOURCE_DATE_EPOCH
           source .venv/bin/activate
-          # pip install --user pipenv
-          # pipenv install
         '';
       };
     });
