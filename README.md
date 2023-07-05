@@ -10,7 +10,10 @@ de acordo com [essa refeência](https://dev.to/chand1012/how-to-host-a-flask-ser
 
 ## Instalação
 
-Último teste bem sucedido foi com o `python 3.6.4` e as bibliotecas com os requisitos estão listadas em `requirements.txt`.
+Último teste bem sucedido foi com o `python 3.11.4` e as bibliotecas podem ser instaladas com
+```shell
+pip install bokeh colorcet flask numpy werkzeug astropy astroquery photutils statsmodels pandas gunicorn
+```
 
 Preciso mexer para que o código seja adequado a versões mais novas, que tenha suporte ainda pela comunidade.
 
