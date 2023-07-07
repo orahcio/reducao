@@ -10,7 +10,9 @@ de acordo com [essa refeência](https://dev.to/chand1012/how-to-host-a-flask-ser
 
 ## Instalação
 
-Último teste bem sucedido foi com o `python 3.6.15` e as bibliotecas podem ser instaladas com
+Tentativa para fazer funcionar no _python 3.11.4_ e nas bibliotecas atualizadas para essa versão.
+
+Último teste bem sucedido foi com o _python 3.6.15_ e as bibliotecas podem ser instaladas com
 ```bash
 pip install bokeh colorcet flask numpy werkzeug astropy astroquery photutils statsmodels pandas gunicorn
 ```
