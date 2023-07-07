@@ -1,7 +1,7 @@
 from bokeh.plotting import figure
 from bokeh.embed import components
 from bokeh.models import ColumnDataSource, DataTable, TableColumn, PointDrawTool, Spinner, WheelZoomTool,\
-    RadioGroup, CustomJS, Paragraph, Button, Slider, TextInput, Toggle, Div, Tabs, TabPanel, CDSView,\
+    RadioGroup, CustomJS, Paragraph, Button, Slider, TextInput, Toggle, Div, Tabs, Panel, CDSView,\
     GroupFilter, Select
 from bokeh.layouts import column, row
 
@@ -191,7 +191,7 @@ def plotfits(dirname):
             p.toolbar.active_tap = tool
             p.toolbar.active_inspect = None
 
-            tab = TabPanel(child=p, title=fil+':'+fname)
+            tab = Panel(child=p, title=fil+':'+fname)
 
             P.append(tab)
             Nimg.append(nimg)
