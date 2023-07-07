@@ -24,7 +24,7 @@ from astropy.wcs import WCS
 from astroquery.astrometry_net import AstrometryNet
 from astroquery.exceptions import TimeoutError
 from bs4 import BeautifulSoup
-from astroquery.ipac.irsa import Irsa
+from astroquery.irsa import Irsa
 
 from astropy.stats import sigma_clipped_stats
 from photutils import DAOStarFinder
