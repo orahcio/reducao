@@ -10,7 +10,6 @@ launch.json
 *.fit
 *.fits
 .vscode
-*.ipynb
 *.corr
 *.xlsx
 data.json

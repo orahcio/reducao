@@ -7,7 +7,7 @@ from bokeh.layouts import column, row
 
 import colorcet as cc
 
-from flask import Flask, flash, render_template, request, redirect, url_for,\
+from flask import Flask, render_template, request, redirect, url_for,\
                   send_from_directory, jsonify, make_response, session, g
 import json
 from numpy.lib.function_base import gradient
@@ -48,7 +48,11 @@ BANDAS = ['fitsB','fitsV','fitsR']
 app = Flask(__name__)
 app.secret_key = '43k5jh3kUIh3h45$##ssds'
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
-
+app.config.update(
+    # SESSION_COOKIE_SECURE=True,
+    SESSION_COOKIE_HTTPONLY=True,
+    SESSION_COOKIE_SAMESITE='Lax',
+)
 
 def allowed_file(filename):
     return '.' in filename and \
@@ -107,8 +111,8 @@ def upload_file():
 @app.route('/plot/<dirname>')
 def plotfits(dirname):
     
-    session.modifeid = True
-    session.samesite = 'None'
+    session.modified = True
+    # session.samesite = 'Lax'
     session['pathname'] = app.config['UPLOAD_FOLDER']+'/'+dirname+'/'
     session['stats'] = {}
     session['date'] = {} # pegar a data para converter em juliana e inserir nas análises

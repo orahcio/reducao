@@ -32,6 +32,7 @@
         venvDir = "./.venv";
         buildInputs = with pkgs.python311Packages; [
           venvShellHook
+          jupyter
           bokeh
           colorcet
           flask
