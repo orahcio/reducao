@@ -48,6 +48,7 @@ BANDAS = ['fitsB','fitsV','fitsR']
 app = Flask(__name__)
 app.secret_key = '43k5jh3kUIh3h45$##ssds'
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
+app.config['SESSION_COOKIE_SAMESITE'] = 'None'
 
 
 def allowed_file(filename):
@@ -107,8 +108,8 @@ def upload_file():
 @app.route('/plot/<dirname>')
 def plotfits(dirname):
     
-    session.modifeid = True
-    session.samesite = 'None'
+    session.modified = True
+    # session.samesite = 'None'
     session['pathname'] = app.config['UPLOAD_FOLDER']+'/'+dirname+'/'
     session['stats'] = {}
     session['date'] = {} # pegar a data para converter em juliana e inserir nas análises
