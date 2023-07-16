@@ -3,10 +3,10 @@
 O servidor pode ser iniciado por exemplo
 
 ```shell
-gunicorn -b 0.0.0.0:5000 app:app
+gunicorn -b 0.0.0.0:5000 app:app --timeout 300
 ```
 
-de acordo com [essa refeência](https://dev.to/chand1012/how-to-host-a-flask-server-with-gunicorn-and-https-942)
+de acordo com [essa refeência](https://dev.to/chand1012/how-to-host-a-flask-server-with-gunicorn-and-https-942). A flag `--timeout` adicionei por conta que para redução em que mais imagens são carregadas é necessário um tempo maior para carregar o aplicativo com todas as imagens.
 
 ## Instalação
 
