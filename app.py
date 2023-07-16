@@ -48,7 +48,7 @@ BANDAS = ['fitsB','fitsV','fitsR']
 app = Flask(__name__)
 app.secret_key = '43k5jh3kUIh3h45$##ssds'
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
-app.config['SESSION_COOKIE_SAMESITE'] = 'None'
+app.config['SESSION_COOKIE_SAMESITE'] = 'Strict'
 
 
 def allowed_file(filename):
