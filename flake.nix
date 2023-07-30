@@ -1,7 +1,7 @@
 {
   inputs = {
     nixpkgs = {
-      url = "github:nixos/nixpkgs/nixos-unstable";
+      url = "github:nixos/nixpkgs/nixos-23.05";
     };
     flake-utils = {
       url = "github:numtide/flake-utils";
@@ -11,6 +11,40 @@
     let
       pkgs = import nixpkgs {
         inherit system;
+      };
+      bokeh3 = pkgs.python311Packages.buildPythonPackage rec {
+        propagatedBuildInputs = with pkgs.python311Packages;[
+          jinja2
+          contourpy
+          packaging
+          pandas
+          pillow
+          pyaml
+          tornado
+          xyzservices
+        ];
+        pname = "bokeh";
+        version = "3.2.1";
+        format = "wheel";
+        url = "https://files.pythonhosted.org/packages/c6/5d/46cde55344ad96a0570e2f72d9df428349a6a800448f6a5b6140c337f930/bokeh-3.2.1-py3-none-any.whl";
+        src = pkgs.fetchurl { # pkgs.python311Packages.fetchPypi {
+          inherit url; # pname version;
+          sha256 = "71b882c2c9233750d80b941ebb980e03d5112f27f84c7bb2293af5c210a8e21c";
+        };
+      };
+      jupyter_bokeh = pkgs.python311Packages.buildPythonPackage rec {
+        propagatedBuildInputs = with pkgs.python311Packages;[
+          bokeh3
+          ipywidgets
+        ];
+        pname = "jupyter_bokeh";
+        version = "3.0.7";
+        format = "wheel";
+        url = "https://files.pythonhosted.org/packages/99/c6/c4b923e6db17cfa52d3df37a0b7b0441e289d4e4ccfd0bc286ee51600ac5/jupyter_bokeh-3.0.7-py3-none-any.whl";
+        src = pkgs.fetchurl { # pkgs.python311Packages.fetchPypi {
+          inherit url; # pname version;
+          sha256 = "676d74bd8b95c7467d5e7ea1c954b306c7768b7bfa2bb3dd32e64efdf7dc09ee";
+        };
       };
       my_photutils = pkgs.python311Packages.buildPythonPackage rec {
         propagatedBuildInputs = with pkgs.python311Packages;[
@@ -32,8 +66,9 @@
         venvDir = "./.venv";
         buildInputs = with pkgs.python311Packages; [
           venvShellHook
-          jupyter
-          bokeh
+          jupyterlab
+          jupyter_bokeh
+          bokeh3
           colorcet
           flask
           numpy
@@ -59,7 +94,7 @@
           
           # Dir where built packages are stored
           export PIP_PREFIX=$(pwd)/_build/pip_packages
-          export PYTHONPATH="$PIP_PREFIX/${pkgs.python3.sitePackages}:$PYTHONPATH"
+          export PYTHONPATH="$PIP_PREFIX/${pkgs.python311.sitePackages}:$PYTHONPATH"
           export PATH="$PIP_PREFIX/bin:$PATH"
           
           # for Numpy
@@ -73,7 +108,7 @@
           #   export LD_LIBRARY_PATH=${pkgs.libGLU}/lib:$LD_LIBRARY_PATH
 
           unset SOURCE_DATE_EPOCH
-          source .venv/bin/activate
+          # source .venv/bin/activate
         '';
       };
     });

@@ -3,10 +3,12 @@
 O servidor pode ser iniciado por exemplo
 
 ```shell
-gunicorn -b 0.0.0.0:5000 app:app
+gunicorn -b 0.0.0.0:5000 app:app --timeout 0 -w 4[2]
 ```
 
 de acordo com [essa refeência](https://dev.to/chand1012/how-to-host-a-flask-server-with-gunicorn-and-https-942)
+
+Acrescentei as flags `--timeout 0` para desligar o tempo de 30s de requisição (algumas figuras são grandes para serem enviadas para o usuário irá demorar), e `-w 4` ou `2` para deixar um número de _workers_ mais padronizado conforme documentção do _gunicorn_. Não vi muito para que serve o número de _workers_.
 
 ## Instalação
 

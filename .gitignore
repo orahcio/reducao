@@ -14,3 +14,4 @@ launch.json
 *.xlsx
 data.json
 upfolder/
+*-checkpoint.ipynb
