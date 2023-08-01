@@ -187,7 +187,7 @@ def plotfits(dirname):
             p.x_range.range_padding = p.y_range.range_padding = 0
             p.grid.grid_line_width = 0
 
-            view = CDSView(filters=[GroupFilter(column_name='banda', group=fil+':'+fname)])
+            view = CDSView(filter=GroupFilter(column_name='banda', group=fil+':'+fname))
             c = p.circle('x','y', source=source, view=view, color='colors', fill_color=None, radius=r, line_width=2)
             cd = p.circle_dot('x','y', source=source, view=view, color='colors', size=2)
             tool = PointDrawTool(renderers=[c,cd],empty_value='na')
