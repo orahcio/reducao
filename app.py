@@ -181,7 +181,7 @@ def plotfits(dirname):
             img = fits.getdata(session['pathname']+fname)
             stretch = HistEqStretch(img) # Histograma, melhor função para granular a imagem
             h,w = img.shape # número de linhas e colunas da matriz da imagem
-            nimg = stretch(normal(img)).tolist()
+            nimg = stretch(normal(img))
             p = figure(width=700, active_scroll='wheel_zoom')
             p.image(image=[nimg], x=0, y=0, dw=w, dh=h, palette='Greys256', level="image")
             p.x_range.range_padding = p.y_range.range_padding = 0
