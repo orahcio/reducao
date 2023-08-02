@@ -16,7 +16,7 @@ Tentativa para fazer funcionar no _python 3.11.4_ e nas bibliotecas atualizadas 
 
 Último teste bem sucedido foi com o _python 3.6.15_ e as bibliotecas podem ser instaladas com
 ```bash
-pip install bokeh colorcet flask numpy werkzeug astropy astroquery photutils statsmodels pandas gunicorn
+pip install bokeh colorcet flask numpy werkzeug astropy astroquery photutils statsmodels pandas openpyxl gunicorn
 ```
 ou
 ```bash
