@@ -323,19 +323,33 @@ function send_2mass(source) {
 
 
 function reset_onclick(source,tabela) {
+    // Tentei remover os dados da tabela usando javascript
+    // mas isso tá muito bugado no bokeh
+    fetch(`${window.origin}/reiniciar`, {
+        method: "POST",
+        credentials: "include",
+        body: "nobody",
+        cache: "no-cache",
+        headers: new Headers({
+            "content-type": "application/json"
+        })
+    })
+    .then(function (response) {
+        if (response.status !== 200) {
+            console.log(`Looks like there was a problem. Status code: ${response.status}`);
+            return;
+        }
+        response.json().then(function (res) {
+            // Mudara essa resposta aqui
+            console.log('Acabaou de chegar: ',res);
+        });
+    })
+    .catch(function (error) {
+        console.log("Fetch error: " + error);
+    });
 
-    console.log(tabela)
-    new_data = {}
+    window.location.reload();
 
-    for (const [key, v] of Object.entries(source.data)) {
-        new_data[key] = []
-    }
-    tabela.source.data = new_data
-    tabela.source.chage.emit()
-    // source.length = 0
-
-    N = 0;
-    // console.log(source)
 }
 
 

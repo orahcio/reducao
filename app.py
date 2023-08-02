@@ -247,7 +247,7 @@ def plotfits(dirname):
     salvar_onclick(source);
     '''))
 
-    reset = Button(label='Limpar', button_type='success')
+    reset = Button(label='Reiniciar', button_type='success')
     reset.js_on_click(CustomJS(args=dict(source=source,tabela=tabela), code='''
     reset_onclick(source,tabela);
     '''))
@@ -490,6 +490,33 @@ def create_entry():
         return res
     
     return make_response(jsonify({'message': 'Tabela vazia'}), 200)
+
+
+@app.route("/reiniciar", methods=["POST"])
+def reset_data():
+    '''
+    Essa rota salva uma tabela vazia mesmo que uma já exista
+    para que a análise seja reiniciada
+    '''
+
+    req = request.get_json()
+    out = pd.DataFrame(dict(
+        ra=[],
+        dec=[],
+        x=[],
+        y=[],
+        flux = [],
+        j = [],
+        k = [],
+        tipo=[], # se é obj, src ou sky
+        banda=[], # o filtro da imagem e arquivo
+        sid=[], # id da estrela copiada
+        colors=[], # para colorir de acordo o tipo de objeto
+    ))
+
+    out.to_excel(session['pathname']+'data.xlsx',index=False)
+    
+    return make_response(jsonify({"message": "Tabela reiniciada"}), 200)
 
 
 @app.route("/busca",methods=['POST'])
