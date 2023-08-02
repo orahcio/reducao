@@ -139,7 +139,10 @@ def plotfits(dirname):
     try:
         cordata = pd.read_excel(session['pathname']+'data.xlsx')
         # Dados que serão usados para fazer computação e visualizar os pontos
-        source = ColumnDataSource(cordata)
+        if not len(cordata):
+            source = ColumnDataSource({k: [] for k in cordata.columns})
+        else:
+            source = ColumnDataSource(cordata)
 
         print('Coordenadas carregadas.')
     except FileNotFoundError:
