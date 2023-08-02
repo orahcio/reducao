@@ -79,6 +79,7 @@
           statsmodels
           gunicorn
           pandas
+          openpyxl
           #poetry
           pkgs.stdenv.cc.cc
           pkgs.zlib

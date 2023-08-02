@@ -147,40 +147,27 @@ const clip = (y) => {
 }
 
 
-var active = 0;
-
-
-function tabs_onchange(cb_obj) {
-    active = cb_obj.active;
-    activeTab = cb_obj.tabs[active].title
-
-    console.log(activeTab)
-    console.log(cb_obj)
-}
-
-
 function contrast_onchange(cb_obj, tabs, im) {
 
-    const x = im[active]
-    var source = tabs[active].child.renderers[0].data_source
+    let a = tabs.active;
+    
+    const x = im[a]
+    const source = tabs.tabs[a].child.renderers[0].data_source
 
-    var y = source.data['image'][0];
-    // console.log(y)
+    let y = source.data.image;
     const ni = y.length
     const nj = y[0].length
-    const n = ni*nj
-    var c = cb_obj.value
-    // console.log(c)
+    const c = cb_obj.value
 
     // console.log('x: ', x) 
-    // Clip values
-    y = clip(y)
     for(let i=0;i<ni;i++) {
         for(let j=0;j<nj;j++) {
-            y[i][j] = Math.pow(x[i][j]+1e-8,10**c)
+            y[i][j] = Math.pow(x[i*ni+j]+1e-8,2**c)
         }
     }
+    // Clip values
     y = clip(y)
+
     source.change.emit()
 }
 
@@ -335,22 +322,20 @@ function send_2mass(source) {
 }
 
 
-function reset_onclick(source) {
-    let data = source.data;
+function reset_onclick(source,tabela) {
 
-    data['sid']=[];
-    data['x'] = [];
-    data['y'] = [];
-    data['tipo'] = [];
-    data['banda'] = [];
-    data['ra'] = [];
-    data['dec'] = [];
-    data['flux'] = [];
-    data['j'] = [];
-    data['k'] = [];
-    data['colors'] = [];
+    console.log(tabela)
+    new_data = {}
 
-    source.change.emit()
+    for (const [key, v] of Object.entries(source.data)) {
+        new_data[key] = []
+    }
+    tabela.source.data = new_data
+    tabela.source.chage.emit()
+    // source.length = 0
+
+    N = 0;
+    // console.log(source)
 }
 
 

@@ -10,12 +10,20 @@
   <body>
     <h2>Clique na imagem para selecionar a centróide do objeto (obj), estrela (src) ou céu (sky).</h2>
     {{ the_div|safe }}
+    <!--
+      Ref.: https://docs.bokeh.org/en/latest/docs/user_guide/output/embed.html
+      troque a versão do bokeh pela que está usando atualmente
+    -->
     <script type=text/javascript src="{{ url_for('static', filename='js/scripts.js') }}"></script>
-    <script src="https://cdn.bokeh.org/bokeh/release/bokeh-2.2.3.min.js"
+    <script src="https://cdn.bokeh.org/bokeh/release/bokeh-3.2.1.min.js"
         crossorigin="anonymous"></script>
-    <script src="https://cdn.bokeh.org/bokeh/release/bokeh-widgets-2.2.3.min.js"
+    <script src="https://cdn.bokeh.org/bokeh/release/bokeh-widgets-3.2.1.min.js"
         crossorigin="anonymous"></script>
-    <script src="https://cdn.bokeh.org/bokeh/release/bokeh-tables-2.2.3.min.js"
+    <script src="https://cdn.bokeh.org/bokeh/release/bokeh-tables-3.2.1.min.js"
+        crossorigin="anonymous"></script>
+    <script src="https://cdn.bokeh.org/bokeh/release/bokeh-gl-3.2.1.min.js"
+        crossorigin="anonymous"></script>
+    <script src="https://cdn.bokeh.org/bokeh/release/bokeh-mathjax-3.2.1.min.js"
         crossorigin="anonymous"></script>
     {{ the_script|safe }}
   </body>
