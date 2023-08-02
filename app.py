@@ -499,7 +499,6 @@ def reset_data():
     para que a análise seja reiniciada
     '''
 
-    req = request.get_json()
     out = pd.DataFrame(dict(
         ra=[],
         dec=[],

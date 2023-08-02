@@ -348,7 +348,7 @@ function reset_onclick(source,tabela) {
         console.log("Fetch error: " + error);
     });
 
-    window.location.reload();
+    // window.location.reload();
 
 }
 
