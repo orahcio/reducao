@@ -12,11 +12,11 @@ Acrescentei as flags `--timeout 0` para desligar o tempo de 30s de requisição 
 
 ## Instalação
 
-Tentativa para fazer funcionar no _python 3.11.4_ e nas bibliotecas atualizadas para essa versão.
+Tentativa para fazer funcionar no _python 3.11.6_ e nas bibliotecas atualizadas para essa versão.
 
 Último teste bem sucedido foi com o _python 3.6.15_ e as bibliotecas podem ser instaladas com
 ```bash
-pip install bokeh colorcet flask numpy werkzeug astropy astroquery photutils statsmodels pandas openpyxl gunicorn
+pip install bokeh colorcet flask numpy werkzeug astropy astroquery photutils statsmodels pandas aopenpyxl gunicorn xlrd
 ```
 ou
 ```bash
