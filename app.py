@@ -1,13 +1,13 @@
 from bokeh.plotting import figure
 from bokeh.embed import components
 from bokeh.models import ColumnDataSource, DataTable, TableColumn, PointDrawTool, Spinner, WheelZoomTool,\
-    RadioGroup, CustomJS, Paragraph, Button, Slider, TextInput, Toggle, Div, Tabs, Panel, CDSView,\
+    RadioGroup, CustomJS, Paragraph, Button, Slider, TextInput, Toggle, Div, Tabs, TabPanel, CDSView,\
     GroupFilter, Select
 from bokeh.layouts import column, row
 
 import colorcet as cc
 
-from flask import Flask, flash, render_template, request, redirect, url_for,\
+from flask import Flask, render_template, request, redirect, url_for,\
                   send_from_directory, jsonify, make_response, session, g
 import json
 from numpy.lib.function_base import gradient
@@ -48,8 +48,11 @@ BANDAS = ['fitsB','fitsV','fitsR']
 app = Flask(__name__)
 app.secret_key = '43k5jh3kUIh3h45$##ssds'
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
-app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
-
+app.config.update(
+    # SESSION_COOKIE_SECURE=True,
+    SESSION_COOKIE_HTTPONLY=True,
+    SESSION_COOKIE_SAMESITE='Lax',
+)
 
 def allowed_file(filename):
     return '.' in filename and \
@@ -109,7 +112,7 @@ def upload_file():
 def plotfits(dirname):
     
     session.modified = True
-    # session.samesite = 'None'
+    # session.samesite = 'Lax'
     session['pathname'] = app.config['UPLOAD_FOLDER']+'/'+dirname+'/'
     session['stats'] = {}
     session['date'] = {} # pegar a data para converter em juliana e inserir nas análises
@@ -136,7 +139,22 @@ def plotfits(dirname):
     try:
         cordata = pd.read_excel(session['pathname']+'data.xlsx')
         # Dados que serão usados para fazer computação e visualizar os pontos
-        source = ColumnDataSource(cordata)
+        if len(cordata)>0:
+            source = ColumnDataSource(cordata)
+        else:
+            source = ColumnDataSource(dict(
+            ra=[],
+            dec=[],
+            x=[],
+            y=[],
+            flux = [],
+            j = [],
+            k = [],
+            tipo=[], # se é obj, src ou sky
+            banda=[], # o filtro da imagem e arquivo
+            sid=[], # id da estrela copiada
+            colors=[], # para colorir de acordo o tipo de objeto
+        ))
 
         print('Coordenadas carregadas.')
     except FileNotFoundError:
@@ -178,13 +196,13 @@ def plotfits(dirname):
             img = fits.getdata(session['pathname']+fname)
             stretch = HistEqStretch(img) # Histograma, melhor função para granular a imagem
             h,w = img.shape # número de linhas e colunas da matriz da imagem
-            nimg = stretch(normal(img)).tolist()
-            p = figure(plot_width=700, active_scroll='wheel_zoom')
+            nimg = stretch(normal(img))
+            p = figure(width=700, output_backend="webgl", active_scroll='wheel_zoom')
             p.image(image=[nimg], x=0, y=0, dw=w, dh=h, palette='Greys256', level="image")
             p.x_range.range_padding = p.y_range.range_padding = 0
             p.grid.grid_line_width = 0
 
-            view = CDSView(source=source,filters=[GroupFilter(column_name='banda', group=fil+':'+fname)])
+            view = CDSView(filter=GroupFilter(column_name='banda', group=fil+':'+fname))
             c = p.circle('x','y', source=source, view=view, color='colors', fill_color=None, radius=r, line_width=2)
             cd = p.circle_dot('x','y', source=source, view=view, color='colors', size=2)
             tool = PointDrawTool(renderers=[c,cd],empty_value='na')
@@ -192,18 +210,18 @@ def plotfits(dirname):
             p.toolbar.active_tap = tool
             p.toolbar.active_inspect = None
 
-            tab = Panel(child=p, title=fil+':'+fname)
+            tab = TabPanel(child=p, title=fil+':'+fname)
 
             P.append(tab)
             Nimg.append(nimg)
     
     graficos = Tabs(tabs=P)
-    graficos.js_on_change('active', CustomJS(code='''
-    tabs_onchange(cb_obj);
-    '''))
+    # graficos.js_on_change('active', CustomJS(code='''
+    # tabs_onchange(cb_obj);
+    # '''))
 
-    contrast = Slider(start=-1, end=6, value=1, step=0.05, title="Contraste")
-    contrast.js_on_change('value',CustomJS(args = dict(tabs=graficos.tabs, im=Nimg), code = '''
+    contrast = Slider(start=-1, end=36, value=1, step=0.5, title="Contraste")
+    contrast.js_on_change('value',CustomJS(args = dict(tabs=graficos, im=Nimg), code = '''
     contrast_onchange(cb_obj,tabs,im);
     '''))
 
@@ -212,8 +230,8 @@ def plotfits(dirname):
     LABELS = ['obj','src','sky']
     radio_group = RadioGroup(labels=LABELS, active=0)
 
-    # Evento de mudança da tabela de table, para inserir table padrão nas colunas inalteradas
-    source.js_on_change('data', CustomJS(args=dict(radio=radio_group, graficos=graficos), code='''
+    # # Evento de mudança da tabela de table, para inserir table padrão nas colunas inalteradas
+    source.js_on_change('change:data', CustomJS(args=dict(radio=radio_group, graficos=graficos), code='''
     source_onchange(cb_obj, radio, graficos);
     '''))
     
@@ -244,9 +262,9 @@ def plotfits(dirname):
     salvar_onclick(source);
     '''))
 
-    reset = Button(label='Limpar', button_type='success')
-    reset.js_on_click(CustomJS(args=dict(source=source), code='''
-    reset_onclick(source);
+    reset = Button(label='Reiniciar', button_type='success')
+    reset.js_on_click(CustomJS(args=dict(source=source,tabela=tabela), code='''
+    reset_onclick(source,tabela);
     '''))
 
     copiar = Button(label='Copiar coordenadas', button_type='success')
@@ -257,6 +275,8 @@ def plotfits(dirname):
     div, script = components(row(column(contrast,spinner,radio_title,radio_group),\
         column(row(reset,copiar,salvar), graficos, tabela, sizing_mode='stretch_both'),
         column(text1,apikey_input,text2,seletor,text3,send_astrometry,text4)))
+    # div, script = components(row(column(contrast,spinner,radio_title,radio_group),\
+    #                              column(graficos)))
 
     return render_template('plot.html', the_div=div, the_script=script,filename=dirdata['name'])
 
@@ -487,6 +507,32 @@ def create_entry():
     return make_response(jsonify({'message': 'Tabela vazia'}), 200)
 
 
+@app.route("/reiniciar", methods=["POST"])
+def reset_data():
+    '''
+    Essa rota salva uma tabela vazia mesmo que uma já exista
+    para que a análise seja reiniciada
+    '''
+
+    out = pd.DataFrame(dict(
+        ra=[],
+        dec=[],
+        x=[],
+        y=[],
+        flux = [],
+        j = [],
+        k = [],
+        tipo=[], # se é obj, src ou sky
+        banda=[], # o filtro da imagem e arquivo
+        sid=[], # id da estrela copiada
+        colors=[], # para colorir de acordo o tipo de objeto
+    ))
+
+    out.to_excel(session['pathname']+'data.xlsx',index=False)
+    
+    return make_response(jsonify({"message": "Tabela reiniciada"}), 200)
+
+
 @app.route("/busca",methods=['POST'])
 def search_2MASS():
     '''
@@ -708,8 +754,8 @@ def reducao(dirname):
 
 def main():
     port = int(os.environ.get("PORT",5000))
-    app.run(host="0.0.0.0", port=port)
-    # app.run(host="0.0.0.0", port=port, debug=True)
+    # app.run(host="0.0.0.0", port=port)
+    app.run(debug=True)
 
 
 if __name__ == "__main__":
