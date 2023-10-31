@@ -3,7 +3,7 @@
 O servidor pode ser iniciado por exemplo
 
 ```shell
-gunicorn -b 0.0.0.0:5000 app:app --timeout 0 -w 4[2]
+gunicorn -b 0.0.0.0:5000 app:app --timeout 0 -w 4
 ```
 
 de acordo com [essa refeência](https://dev.to/chand1012/how-to-host-a-flask-server-with-gunicorn-and-https-942). A flag `--timeout` adicionei por conta que para redução em que mais imagens são carregadas é necessário um tempo maior para carregar o aplicativo com todas as imagens.
@@ -16,7 +16,7 @@ Tentativa para fazer funcionar no _python 3.11.6_ e nas bibliotecas atualizadas 
 
 Último teste bem sucedido foi com o _python 3.6.15_ e as bibliotecas podem ser instaladas com
 ```bash
-pip install bokeh colorcet flask numpy werkzeug astropy astroquery photutils statsmodels pandas aopenpyxl gunicorn xlrd
+pip install bokeh colorcet flask numpy werkzeug astropy astroquery photutils statsmodels pandas openpyxl gunicorn xlrd
 ```
 ou
 ```bash
