@@ -63,8 +63,8 @@ def normal(valores):
     import numpy as np
 
     n, m = valores.shape
-    b = np.max(valores)
-    a = np.min(valores)
+    b = float(np.max(valores))
+    a = float(np.min(valores))
     ba = b-a
 
     imagem = np.zeros(valores.shape)
