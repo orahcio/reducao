@@ -62,10 +62,17 @@ def allowed_file(filename):
 def normal(valores):
     import numpy as np
 
+    n, m = valores.shape
     b = np.max(valores)
     a = np.min(valores)
+    ba = b-a
 
-    return (np.float64(valores) - a)/(b-a)
+    imagem = np.zeros(valores.shape)
+    for i in range(n):
+        for j in range(m):
+            imagem[i,j] = (float(valores[i,j])-a)/ba
+
+    return imagem
 
 
 @app.route("/")
