@@ -65,7 +65,7 @@ def normal(valores):
     b = np.max(valores)
     a = np.min(valores)
 
-    return (valores - a)/(b-a)
+    return (np.float64(valores) - a)/(b-a)
 
 
 @app.route("/")
