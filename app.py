@@ -201,7 +201,7 @@ def plotfits(dirname):
     for fil in BANDAS:
         for fname in dirdata[fil]:
             img = fits.getdata(session['pathname']+fname)
-            stretch = HistEqStretch(img) # Histograma, melhor função para granular a imagem
+            stretch = HistEqStretch(normal(img)) # Histograma, melhor função para granular a imagem
             h,w = img.shape # número de linhas e colunas da matriz da imagem
             nimg = stretch(normal(img))
             p = figure(width=700, output_backend="webgl", active_scroll='wheel_zoom')
