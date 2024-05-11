@@ -24,7 +24,7 @@ from astropy.wcs import WCS
 from astroquery.astrometry_net import AstrometryNet
 from astroquery.exceptions import TimeoutError
 from bs4 import BeautifulSoup
-from astroquery.irsa import Irsa
+from astroquery.ipac.irsa import Irsa
 
 from astropy.stats import sigma_clipped_stats
 from photutils import DAOStarFinder
@@ -372,8 +372,8 @@ def query_2MASS(ra,dec):
 
     crval = SkyCoord(ra=ra, dec=dec, unit='deg', frame='icrs')
 
-    Q = Irsa.query_region(crval,catalog='fp_psc',spatial='Cone', radius=rw,\
-                           selcols=['ra','dec','j_m','k_m']).to_pandas()
+    Q = Irsa.query_region(crval,catalog='fp_psc',spatial='Cone',\
+                          radius=rw)[['ra','dec','j_m','k_m']].to_pandas()
     print(Q)
     m = SkyCoord(ra=Q['ra'],dec=Q['dec'], unit=('deg','deg'), frame='icrs')
     idx, _, _ = match_coordinates_sky(crval,m)
@@ -699,7 +699,7 @@ def reducao(dirname):
         S = pd.DataFrame(INDICES)
         S.to_excel(output)
         O = pd.DataFrame(INDICEO)
-        O.to_excel('.'+output.strip('\.xlsx')+'_obj.xlsx')
+        O.to_excel('.'+output.strip(r'.xlsx')+'_obj.xlsx')
 
     # pegando coeficientes
     Tvr = []; Tv = []; Tbv = []
@@ -716,7 +716,7 @@ def reducao(dirname):
         Tv = Tv,
         Tbv = Tbv
     ))
-    coef.to_excel('.'+output.strip('\.xlsx')+'_coef.xlsx')
+    coef.to_excel('.'+output.strip(r'.xlsx')+'_coef.xlsx')
 
     # Colcular os índices do objeto
     OBJETO = {}
@@ -737,7 +737,7 @@ def reducao(dirname):
     table = pd.DataFrame(OBJETO)
     juliantable = pd.DataFrame(TEMPO, index=[0])
 
-    with pd.ExcelWriter('.'+output.strip('\.xlsx')+'_objstar.xlsx') as writer:
+    with pd.ExcelWriter('.'+output.strip(r'.xlsx')+'_objstar.xlsx') as writer:
         print(table)
         table.to_excel(writer)
         juliantable.to_excel(writer,startrow=len(v.tolist()))
