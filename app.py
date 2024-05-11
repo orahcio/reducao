@@ -561,7 +561,8 @@ def search_2MASS():
     crval = SkyCoord(ra=np.mean(data['ra']), dec=np.mean(data['dec']), unit='deg', frame='icrs')
     r = 1.1*crval.separation(src).max()
 
-    Q = Irsa.query_region(crval,catalog='fp_psc',spatial='Cone', radius=r,selcols=['ra','dec','j_m','k_m']).to_pandas()
+    Q = Irsa.query_region(crval,catalog='fp_psc',spatial='Cone',\
+                          radius=r)[['ra','dec','j_m','k_m']].to_pandas()
     print(Q)
     m = SkyCoord(ra=Q['ra'],dec=Q['dec'], unit=('deg','deg'), frame='icrs')
     idx, d2, _ = match_coordinates_sky(src,m)
