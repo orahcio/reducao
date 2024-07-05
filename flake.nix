@@ -50,7 +50,7 @@
           venvShellHook
           jupyter_bokeh
           bokeh
-          # colorcet
+          colorcet
           flask
           numpy
           werkzeug
