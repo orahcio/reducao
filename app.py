@@ -211,7 +211,7 @@ def plotfits(dirname):
 
             view = CDSView(filter=GroupFilter(column_name='banda', group=fil+':'+fname))
             c = p.circle('x','y', source=source, view=view, color='colors', fill_color=None, radius=r, line_width=2)
-            cd = p.circle_dot('x','y', source=source, view=view, color='colors', size=2)
+            cd = p.scatter('x','y', source=source, marker='circle_dot', view=view, color='colors', size=2)
             tool = PointDrawTool(renderers=[c,cd],empty_value='na')
             p.add_tools(tool)
             p.toolbar.active_tap = tool
