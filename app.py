@@ -604,9 +604,9 @@ def reducao(dirname):
     '''
     Faz a redução de table caso exista a tabela com os table
     '''
-    filepath = app.config['UPLOAD_FOLDER']+'/%s/data.xlsx' % dirname
-    output = app.config['UPLOAD_FOLDER']+'/%s/result.xlsx' % dirname
-    filedata = app.config['UPLOAD_FOLDER']+'/%s/data.json' % dirname
+    filepath = f"{app.config['UPLOAD_FOLDER']}/{dirname}/data.xlsx"
+    output = f"{app.config['UPLOAD_FOLDER']}/{dirname}/result.xlsx"
+    filedata = f"{app.config['UPLOAD_FOLDER']}/{dirname}/data.json"
     
     mag = lambda x: -2.5*np.log10(x)
 
@@ -614,7 +614,8 @@ def reducao(dirname):
     with open(filedata) as f:
         datadir = json.load(f)
     print('abriu data.json')
-    table = pd.read_excel(filepath)
+    #                               adicionei essa parte para remover duplicatas que porventura surgiram na hora de clicar
+    table = pd.read_excel(filepath).drop_duplicates(subset=['sid','banda','j','k'], keep='first')
     table['mag'] = 0 # criando a coluna de magnitudes
 
     # Selecionando estrelas dentro do intervalo
@@ -652,9 +653,9 @@ def reducao(dirname):
     # Construindo tabela lado a lado
 
     for i in range(len(datadir['fitsR'])):
-        bstr = 'fitsB:'+datadir['fitsB'][i]
-        vstr = 'fitsV:'+datadir['fitsV'][i]
-        rstr = 'fitsR:'+datadir['fitsR'][i]
+        bstr = f'fitsB:{datadir['fitsB'][i]}'
+        vstr = f'fitsV:{datadir['fitsV'][i]}'
+        rstr = f'fitsR:{datadir['fitsR'][i]}'
 
         # Índices instrumentais
         idb =  ids & (table['banda'] == bstr)
@@ -667,16 +668,16 @@ def reducao(dirname):
         b_v = b-v
 
         # b, v e r instrumentais
-        INDICES['b'+str(i)] = b
-        INDICES['v'+str(i)] = v
-        INDICES['r'+str(i)] = r
+        INDICES[f'b{i}'] = b
+        INDICES[f'v{i}'] = v
+        INDICES[f'r{i}'] = r
         # b-v instrumental
-        INDICES['b-v_'+str(i)] = b_v
+        INDICES[f'b-v_{i}'] = b_v
         # v-r instrumental
-        INDICES['v-r_'+str(i)] = v_r
+        INDICES[f'v-r_{i}'] = v_r
         # V-v instrumental
         V_v = V-v
-        INDICES['V-v_'+str(i)] = V_v
+        INDICES[f'V-v_{i}'] = V_v
 
         # Índices de objeto
         idb =  ido & (table['banda'] == bstr)
@@ -689,13 +690,13 @@ def reducao(dirname):
         b_vo = bo-vo
 
         # b, v e r instrumentais do objeto
-        INDICEO['b'+str(i)] = bo
-        INDICEO['v'+str(i)] = vo
-        INDICEO['r'+str(i)] = ro
+        INDICEO[f'b{i}'] = bo
+        INDICEO[f'v{i}'] = vo
+        INDICEO[f'r{i}'] = ro
         # b-v instrumental
-        INDICEO['b-v_'+str(i)] = b_vo
+        INDICEO[f'b-v_{i}'] = b_vo
         # v-r instrumental
-        INDICEO['v-r_'+str(i)] = v_ro
+        INDICEO[f'v-r_{i}'] = v_ro
 
         S = pd.DataFrame(INDICES)
         S.to_excel(output)
@@ -706,11 +707,11 @@ def reducao(dirname):
     Tvr = []; Tv = []; Tbv = []
     for i in range(len(datadir['fitsR'])):
         # Tvr é o coeficiente inverso de v-r vs. V-R
-        Tvr.append(1./getcoef(S[['V-R','v-r_'+str(i)]]))
+        Tvr.append(1./getcoef(S[['V-R',f'v-r_{i}']]))
         # Tv é o coeficiente de V-v vs. V-R
-        Tv.append(getcoef(S[['V-R','V-v_'+str(i)]]))
+        Tv.append(getcoef(S[['V-R',f'V-v_{i}']]))
         # Tbv é o inverso do coeficiente de b-v vs. B-V
-        Tbv.append(1./getcoef(S[['B-V','b-v_'+str(i)]]))
+        Tbv.append(1./getcoef(S[['B-V',f'b-v_{i}']]))
 
     coef = pd.DataFrame(dict(
         Tvr = Tvr,
@@ -722,13 +723,13 @@ def reducao(dirname):
     # Colcular os índices do objeto
     OBJETO = {}
     for i in range(len(datadir['fitsR'])):
-        b_v = S['B-V'].values + Tbv[i]*(O['b-v_'+str(i)].values - S['b-v_'+str(i)].values)
-        v_r = S['V-R'].values + Tvr[i]*(O['v-r_'+str(i)].values - S['v-r_'+str(i)].values)
-        v   = O['v'+str(i)].values + S['V-v_'+str(i)] + Tv[i]*(v_r - S['V-R'].values)
+        b_v = S['B-V'].values + Tbv[i]*(O[f'b-v_{i}'].values - S[f'b-v_{i}'].values)
+        v_r = S['V-R'].values + Tvr[i]*(O[f'v-r_{i}'].values - S[f'v-r_{i}'].values)
+        v   = O['v'+str(i)].values + S[f'V-v_{i}'] + Tv[i]*(v_r - S['V-R'].values)
 
-        OBJETO['b-v_'+str(i)] = b_v.tolist()
-        OBJETO['v-r_'+str(i)] = v_r.tolist()
-        OBJETO['v_'+str(i)] = v.tolist()
+        OBJETO[f'b-v_{i}'] = b_v.tolist()
+        OBJETO[f'v-r_{i}'] = v_r.tolist()
+        OBJETO[f'v_{i}'] = v.tolist()
 
     TEMPO = {}
     for i in session['date'].keys():
@@ -748,12 +749,12 @@ def reducao(dirname):
     url3 = request.url_root+'download/'+dirname+'/result_coef.xlsx'
     url4 = request.url_root+'download/'+dirname+'/result_objstar.xlsx'
 
-    return '''Resultados:<br>
-    - <a href="%s">tabela de estrelas</a>;<br>
-    - <a href="%s">tabela de índices do objeto</a>;<br>
-    - <a href="%s">tabela de coeficientes</a>;<br>
-    - <a href="%s">tabela de índices do objeto com as estrelas</a>.
-    ''' % (url1,url2,url3,url4)
+    return f'''Resultados:<br>
+    - <a href="{url1}">tabela de estrelas</a>;<br>
+    - <a href="{url2}">tabela de índices do objeto</a>;<br>
+    - <a href="{url3}">tabela de coeficientes</a>;<br>
+    - <a href="{url4}">tabela de índices do objeto com as estrelas</a>.
+    '''
     # Copiando as estrelas que
 
     #except FileNotFoundError:

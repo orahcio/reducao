@@ -45,10 +45,13 @@
       # };
     in {
       devShell = pkgs.mkShell rec {
-        venvDir = "./.venv";
+        # venvDir = "./.venv";
         buildInputs = with pkgs.python311Packages; [
-          venvShellHook
+          # venvShellHook
           jupyter_bokeh
+          ipykernel
+          notebook
+          pip
           bokeh
           colorcet
           flask
@@ -70,28 +73,28 @@
           #xorg.libX11
         ];
         # Esse approuch permite que eu instale pacotes que estão quebrados no nixos pelo pip
-        shellHook = ''  
-          # for PyTorch
-          export LD_LIBRARY_PATH=${pkgs.stdenv.cc.cc.lib}/lib:$LD_LIBRARY_PATH
+        # shellHook = ''  
+        #   # for PyTorch
+        #   export LD_LIBRARY_PATH=${pkgs.stdenv.cc.cc.lib}/lib:$LD_LIBRARY_PATH
           
-          # Dir where built packages are stored
-          export PIP_PREFIX=$(pwd)/_build/pip_packages
-          export PYTHONPATH="$PIP_PREFIX/${pkgs.python311.sitePackages}:$PYTHONPATH"
-          export PATH="$PIP_PREFIX/bin:$PATH"
+        #   # Dir where built packages are stored
+        #   export PIP_PREFIX=$(pwd)/_build/pip_packages
+        #   export PYTHONPATH="$PIP_PREFIX/${pkgs.python311.sitePackages}:$PYTHONPATH"
+        #   export PATH="$PIP_PREFIX/bin:$PATH"
           
-          # for Numpy
-          export LD_LIBRARY_PATH=${pkgs.zlib}/lib:$LD_LIBRARY_PATH
+        #   # for Numpy
+        #   export LD_LIBRARY_PATH=${pkgs.zlib}/lib:$LD_LIBRARY_PATH
 
-          # export LD_LIBRARY_PATH=${pkgs.glibc}/lib:$LD_LIBRARY_PATH
+        #   # export LD_LIBRARY_PATH=${pkgs.glibc}/lib:$LD_LIBRARY_PATH
 
-          export LD_LIBRARY_PATH=${pkgs.zlib}/lib:$LD_LIBRARY_PATH
-          #   # GL libraries (for gym environment rendering)
-          #   export LD_LIBRARY_PATH=${pkgs.libGL}/lib:$LD_LIBRARY_PATH
-          #   export LD_LIBRARY_PATH=${pkgs.libGLU}/lib:$LD_LIBRARY_PATH
+        #   export LD_LIBRARY_PATH=${pkgs.zlib}/lib:$LD_LIBRARY_PATH
+        #   #   # GL libraries (for gym environment rendering)
+        #   #   export LD_LIBRARY_PATH=${pkgs.libGL}/lib:$LD_LIBRARY_PATH
+        #   #   export LD_LIBRARY_PATH=${pkgs.libGLU}/lib:$LD_LIBRARY_PATH
 
-          unset SOURCE_DATE_EPOCH
-          # source .venv/bin/activate
-        '';
+        #   unset SOURCE_DATE_EPOCH
+        #   # source .venv/bin/activate
+        # '';
       };
     });
 }

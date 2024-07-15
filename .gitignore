@@ -15,3 +15,4 @@ launch.json
 data.json
 upfolder/
 *-checkpoint.ipynb
+*.ipynb
