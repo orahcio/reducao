@@ -614,9 +614,10 @@ def reducao(dirname):
     with open(filedata) as f:
         datadir = json.load(f)
     print('abriu data.json')
-    #                               adicionei essa parte para remover duplicatas que porventura surgiram na hora de clicar
-    table = pd.read_excel(filepath).drop_duplicates(subset=['sid','banda','j','k'], keep='first')
-    table['mag'] = 0 # criando a coluna de magnitudes
+    #                               Adicionei essa parte para remover duplicatas que porventura surgiram na hora de clicar
+    #                                                       Essas colunas garantem que só uma fonte distinta sobreviva na tabela
+    table = pd.read_excel(filepath).drop_duplicates(subset=['sid','banda','j','k','flux'], keep='first')
+    table['mag'] = 0.0 # criando a coluna de magnitudes, não pode iniciar como inteiro, pois vai receber float
 
     # Selecionando estrelas dentro do intervalo
     ids = table['tipo']=='src' # índices pra selecionar estrelas
@@ -629,7 +630,7 @@ def reducao(dirname):
     for e in set(table['banda']):
         med = np.median(table[(table['banda']==e)&(table['tipo']=='sky')]['flux'])
         idx = (table['banda']==e)&(table['tipo']!='sky')
-        table.loc[idx,'mag'] = mag(table.loc[idx, 'flux'].values-med)
+        table.loc[idx,'mag'] = mag(table['flux'][idx]-med)
 
 
     # Calculando índices das estrelas
@@ -653,9 +654,9 @@ def reducao(dirname):
     # Construindo tabela lado a lado
 
     for i in range(len(datadir['fitsR'])):
-        bstr = f'fitsB:{datadir['fitsB'][i]}'
-        vstr = f'fitsV:{datadir['fitsV'][i]}'
-        rstr = f'fitsR:{datadir['fitsR'][i]}'
+        bstr = f"fitsB:{datadir['fitsB'][i]}"
+        vstr = f"fitsV:{datadir['fitsV'][i]}"
+        rstr = f"fitsR:{datadir['fitsR'][i]}"
 
         # Índices instrumentais
         idb =  ids & (table['banda'] == bstr)

@@ -65,7 +65,10 @@ function source_onchange(cb_obj, radio=null, graficos=null) {
     var data = cb_obj.data;
 
     const n = data['x'].length;
+    console.log(data)
+    // Caso o comprimento é maior do que o atual comprimento de dados
     if(n>N) {
+        // Fazer um teste de raio para ver se a estrela é adicionada ou removida
         if(data['sid'][n-1]=='na') {
             const active = graficos.active
             const banda = graficos.tabs[active].title

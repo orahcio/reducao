@@ -10,20 +10,28 @@
   <body>
     <h2>Clique na imagem para selecionar a centróide do objeto (obj), estrela (src) ou céu (sky).</h2>
     {{ the_div|safe }}
+    <!-- Após um erro para a jquery-ui no console pedi pra uma IA construir essas linhas para inserir essa biblioteca -->
+    <!-- Inclua o jQuery -->
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <!-- Inclua o jQuery UI -->
+    <script src="https://code.jquery.com/ui/1.13.0/jquery-ui.min.js"></script>
+    <!-- Inclua o CSS do jQuery UI (opcional) -->
+    <link rel="stylesheet" href="https://code.jquery.com/ui/1.13.0/themes/base/jquery-ui.css">
+
     <!--
       Ref.: https://docs.bokeh.org/en/latest/docs/user_guide/output/embed.html
       troque a versão do bokeh pela que está usando atualmente
     -->
     <script type=text/javascript src="{{ url_for('static', filename='js/scripts.js') }}"></script>
-    <script src="https://cdn.bokeh.org/bokeh/release/bokeh-3.3.0.min.js"
+    <script src="https://cdn.bokeh.org/bokeh/release/bokeh-3.4.1.min.js"
         crossorigin="anonymous"></script>
-    <script src="https://cdn.bokeh.org/bokeh/release/bokeh-widgets-3.3.0.min.js"
+    <script src="https://cdn.bokeh.org/bokeh/release/bokeh-widgets-3.4.1.min.js"
         crossorigin="anonymous"></script>
-    <script src="https://cdn.bokeh.org/bokeh/release/bokeh-tables-3.3.0.min.js"
+    <script src="https://cdn.bokeh.org/bokeh/release/bokeh-tables-3.4.1.min.js"
         crossorigin="anonymous"></script>
-    <script src="https://cdn.bokeh.org/bokeh/release/bokeh-gl-3.3.0.min.js"
+    <script src="https://cdn.bokeh.org/bokeh/release/bokeh-gl-3.4.1.min.js"
         crossorigin="anonymous"></script>
-    <script src="https://cdn.bokeh.org/bokeh/release/bokeh-mathjax-3.3.0.min.js"
+    <script src="https://cdn.bokeh.org/bokeh/release/bokeh-mathjax-3.4.1.min.js"
         crossorigin="anonymous"></script>
     {{ the_script|safe }}
   </body>
