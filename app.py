@@ -142,44 +142,31 @@ def plotfits(dirname):
                 
             session['date'][fil+':'+fname] = Time(header['DATE-OBS']).jd # a data de observação de cada imagem
 
+
+    # Tabela com os dados de coordenadas
+    source = ColumnDataSource(dict(
+        ra=[],
+        dec=[],
+        x=[],
+        y=[],
+        flux = [],
+        j = [],
+        k = [],
+        tipo=[], # se é obj, src ou sky
+        banda=[], # o filtro da imagem e arquivo
+        sid=[], # id da estrela copiada
+        colors=[], # para colorir de acordo o tipo de objeto
+    ))
+
     # Abrindo coordenadas se salvas
     try:
-        cordata = pd.read_excel(session['pathname']+'data.xlsx')
-        # Dados que serão usados para fazer computação e visualizar os pontos
-        if len(cordata)>0:
-            source = ColumnDataSource(cordata)
-        else:
-            source = ColumnDataSource(dict(
-            ra=[],
-            dec=[],
-            x=[],
-            y=[],
-            flux = [],
-            j = [],
-            k = [],
-            tipo=[], # se é obj, src ou sky
-            banda=[], # o filtro da imagem e arquivo
-            sid=[], # id da estrela copiada
-            colors=[], # para colorir de acordo o tipo de objeto
-        ))
-
-        print('Coordenadas carregadas.')
+        cordata = pd.read_excel(session['pathname']+'data.xlsx').to_dict('list')
+        print(cordata)
+        if len(cordata) > 0:
+            source.stream(cordata)
+            print(f'Coordenadas carregadas com {len(cordata)}')
     except FileNotFoundError:
         print('Não há coordenadas salvas em %s' % session['pathname'])
-        # Dados que serão usados para fazer computação e visualizar os pontos
-        source = ColumnDataSource(dict(
-            ra=[],
-            dec=[],
-            x=[],
-            y=[],
-            flux = [],
-            j = [],
-            k = [],
-            tipo=[], # se é obj, src ou sky
-            banda=[], # o filtro da imagem e arquivo
-            sid=[], # id da estrela copiada
-            colors=[], # para colorir de acordo o tipo de objeto
-        ))
 
     # Constrói a tabaela de table que poderá ser usada para designar as posições do objeto, estrela e céu
     tabela = DataTable(source=source,columns=[
@@ -193,7 +180,7 @@ def plotfits(dirname):
         TableColumn(field='tipo',title='tipo'),
         TableColumn(field='banda',title='banda'),
         TableColumn(field='sid',title='sid')
-    ], editable=True)
+    ], editable=False)
     
 
     P = [] # lista de gráficos para o plot
@@ -210,7 +197,7 @@ def plotfits(dirname):
             p.grid.grid_line_width = 0
 
             view = CDSView(filter=GroupFilter(column_name='banda', group=fil+':'+fname))
-            c = p.circle('x','y', source=source, view=view, color='colors', fill_color=None, radius=r, line_width=2)
+            c = p.circle('x','y', source=source, view=view, color='colors', fill_color='colors', radius=r, line_width=2, alpha=0.3, line_alpha=1)
             cd = p.scatter('x','y', source=source, marker='circle_dot', view=view, color='colors', size=2)
             tool = PointDrawTool(renderers=[c,cd],empty_value='na')
             p.add_tools(tool)
@@ -275,8 +262,8 @@ def plotfits(dirname):
     '''))
 
     copiar = Button(label='Copiar coordenadas', button_type='success')
-    copiar.js_on_click(CustomJS(args=dict(source=source, ref=seletor, active=graficos), code='''
-    add_data(source,ref,active);
+    copiar.js_on_click(CustomJS(args=dict(source=source, ref=seletor, radio=radio_group, active=graficos), code='''
+    add_data(source,ref,radio,active);
     '''))
 
     div, script = components(row(column(contrast,spinner,radio_title,radio_group),\
@@ -320,7 +307,7 @@ def recalc_fluxes():
         img = fits.getdata(session['pathname']+fname)
         aperture = CircularAperture(data[['x','y']][data['banda']==banda], r)
         fluxes = aperture_photometry(img,aperture)
-        data['flux'][data['banda']==banda] = fluxes['aperture_sum']
+        data.loc[data['banda']==banda, 'flux'] = fluxes['aperture_sum']
 
 
     res = make_response(data.to_json(),200)
@@ -393,7 +380,6 @@ def add_radec():
     '''
     
     req = request.get_json()
-    print(req)
     fname = req['banda'].split(':')[1]
     img = fits.getdata(session['pathname']+fname)
 
@@ -414,7 +400,8 @@ def add_radec():
             req['j'], req['k'] = query_2MASS(ra,dec)
         else:
             req['j'], req['k'] = 'na','na'
-
+    print(req)
+    print(jsonify(req))
     return make_response(jsonify(req), 200)
 
 

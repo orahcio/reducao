@@ -62,14 +62,21 @@ var N = 0;
 
 function source_onchange(cb_obj, radio=null, graficos=null) {
 
-    var data = cb_obj.data;
+    let data = cb_obj.data;
 
     const n = data['x'].length;
-    console.log(data)
+    // Obtendo o valor N, se o fluxo não foi calculado N é n-1, pois n é porque foi inserido ponto novo
+    if(data['flux'][n-1]==='na' || data['flux'][n-1]===0) {
+        N = n-1
+    }
+    else {
+        N = n
+    }
+    console.log('data:', data)
+    console.log(n,N)
     // Caso o comprimento é maior do que o atual comprimento de dados
     if(n>N) {
-        // Fazer um teste de raio para ver se a estrela é adicionada ou removida
-        if(data['sid'][n-1]=='na') {
+        if(data['flux'][n-1]==='na' || data['flux'][n-1]===0) {
             const active = graficos.active
             const banda = graficos.tabs[active].title
             const labels = radio.labels;
@@ -90,7 +97,7 @@ function source_onchange(cb_obj, radio=null, graficos=null) {
             k: data['k'][n-1],
             banda: data['banda'][n-1]
         }
-        console.log(entry)
+        console.log('entry',entry)
         fetch(`${window.origin}/add`, {
             method: "POST",
             credentials: "include",
@@ -106,24 +113,26 @@ function source_onchange(cb_obj, radio=null, graficos=null) {
                 return;
             }
             response.json().then(function (table) {
-                data['ra'][n-1] = table['ra'];
-                data['dec'][n-1] = table['dec'];
+                data['tipo'][n-1] = table['tipo'];
                 data['x'][n-1] = table['x'];
                 data['y'][n-1] = table['y'];
+                data['ra'][n-1] = table['ra'];
+                data['dec'][n-1] = table['dec'];
                 data['flux'][n-1] = table['flux'];
                 data['j'][n-1] = table['j'];
                 data['k'][n-1] = table['k'];
+                data['banda'][n-1] = table['banda']
 
                 cb_obj.change.emit()
-                console.log('Deu certo')
+                // Atualiza o comprimento da tabela
+                N = n;
+                console.log('Deu certo', table)
             });
         })
         .catch(function (error) {
             console.log("Fetch error: " + error);
         });
     };
-    // Atualiza o comprimento da tabela
-    N = n;
 }
 
 
@@ -356,16 +365,25 @@ function reset_onclick(source,tabela) {
 }
 
 
-const add_data = async(source, ref, graficos) => {
+const add_data = async(source, ref, radio, graficos) => {
     // Função que irá copiar os dados da imagem de referência
 
     console.log(ref.value, graficos.active);
     let data = source.data;
     let active = graficos.active;
+    let banda = graficos.tabs[active].title;
     let refv = ref.value;
 
     let n = data['x'].length; // quantidades de linhas existentes na tabela
 
+    // Pegando os sid's que já existem na aba ativa
+    let sid = [];
+    for(let i=0;i<n;i++) {
+        if(data['banda'][i]===banda && data['tipo'][i]!=='obj') {
+            sid.push(data['sid'][i])
+        }
+    }
+    console.log('sid:',sid, 'refv:', refv)
     let newdata = {
         'sid': [].slice.call(data['sid']),
         'banda': data['banda'],
@@ -382,12 +400,13 @@ const add_data = async(source, ref, graficos) => {
     //let newData = make_entry(data);
     for(let i=0;i<n;i++) {
         // console.log('P: ',refv, 'T', data['banda'][i])
-        if(data['banda'][i]===refv && data['tipo'][i]!=='obj') {
+        console.log('Testando:',i, sid)
+        if(data['banda'][i]===refv && data['tipo'][i]!=='obj' && !sid.includes(i)) {
             // await new Promise(r => setTimeout(r,1000));
             newdata['sid'].push(i); // copia o índice do ponto original
             newdata['x'].push(data['x'][i]);
             newdata['y'].push(data['y'][i]);
-            newdata['flux'].push('na');
+            newdata['flux'].push(0);
             newdata['tipo'].push(data['tipo'][i]);
             newdata['banda'].push(graficos.tabs[active].title);
             newdata['ra'].push(data['ra'][i]);
@@ -396,7 +415,7 @@ const add_data = async(source, ref, graficos) => {
             newdata['k'].push(data['k'][i]);
             newdata['colors'].push(data['colors'][i]);
             source.data = newdata;
-            source_onchange(source);
+            source_onchange(source, radio, graficos);
         }
     }
 
