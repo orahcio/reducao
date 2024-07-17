@@ -4,6 +4,7 @@ from bokeh.models import ColumnDataSource, DataTable, TableColumn, PointDrawTool
     RadioGroup, CustomJS, Paragraph, Button, Slider, TextInput, Toggle, Div, Tabs, TabPanel, CDSView,\
     GroupFilter, Select
 from bokeh.layouts import column, row
+from bokeh import __version__ as ver
 
 import colorcet as cc
 
@@ -272,7 +273,7 @@ def plotfits(dirname):
     # div, script = components(row(column(contrast,spinner,radio_title,radio_group),\
     #                              column(graficos)))
 
-    return render_template('plot.html', the_div=div, the_script=script,filename=dirdata['name'])
+    return render_template('plot.html', the_div=div, the_script=script,filename=dirdata['name'],bokeh=ver)
 
 
 @app.route('/fluxes', methods=['POST'])

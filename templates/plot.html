@@ -23,15 +23,15 @@
       troque a versão do bokeh pela que está usando atualmente
     -->
     <script type=text/javascript src="{{ url_for('static', filename='js/scripts.js') }}"></script>
-    <script src="https://cdn.bokeh.org/bokeh/release/bokeh-3.4.1.min.js"
+    <script src="https://cdn.bokeh.org/bokeh/release/bokeh-{{ bokeh|safe }}.min.js"
         crossorigin="anonymous"></script>
-    <script src="https://cdn.bokeh.org/bokeh/release/bokeh-widgets-3.4.1.min.js"
+    <script src="https://cdn.bokeh.org/bokeh/release/bokeh-widgets-{{ bokeh|safe }}.min.js"
         crossorigin="anonymous"></script>
-    <script src="https://cdn.bokeh.org/bokeh/release/bokeh-tables-3.4.1.min.js"
+    <script src="https://cdn.bokeh.org/bokeh/release/bokeh-tables-{{ bokeh|safe }}.min.js"
         crossorigin="anonymous"></script>
-    <script src="https://cdn.bokeh.org/bokeh/release/bokeh-gl-3.4.1.min.js"
+    <script src="https://cdn.bokeh.org/bokeh/release/bokeh-gl-{{ bokeh|safe }}.min.js"
         crossorigin="anonymous"></script>
-    <script src="https://cdn.bokeh.org/bokeh/release/bokeh-mathjax-3.4.1.min.js"
+    <script src="https://cdn.bokeh.org/bokeh/release/bokeh-mathjax-{{ bokeh|safe }}.min.js"
         crossorigin="anonymous"></script>
     {{ the_script|safe }}
   </body>

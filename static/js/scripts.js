@@ -79,10 +79,12 @@ function source_onchange(cb_obj, radio=null, graficos=null) {
         if(data['flux'][n-1]==='na' || data['flux'][n-1]===0) {
             const active = graficos.active
             const banda = graficos.tabs[active].title
-            const labels = radio.labels;
-            data['tipo'][n-1] = labels[radio.active];
+            if(radio !== null){
+                const labels = radio.labels;
+                data['tipo'][n-1] = labels[radio.active];
+                data['colors'][n-1] = COLORS[radio.active];
+            }
             data['banda'][n-1] = banda;
-            data['colors'][n-1] = COLORS[radio.active];
         }
 
 
@@ -119,8 +121,10 @@ function source_onchange(cb_obj, radio=null, graficos=null) {
                 data['ra'][n-1] = table['ra'];
                 data['dec'][n-1] = table['dec'];
                 data['flux'][n-1] = table['flux'];
-                data['j'][n-1] = table['j'];
-                data['k'][n-1] = table['k'];
+                if(radio!==null) {
+                    data['j'][n-1] = table['j'];
+                    data['k'][n-1] = table['k'];
+                }
                 data['banda'][n-1] = table['banda']
 
                 cb_obj.change.emit()
@@ -415,7 +419,7 @@ const add_data = async(source, ref, radio, graficos) => {
             newdata['k'].push(data['k'][i]);
             newdata['colors'].push(data['colors'][i]);
             source.data = newdata;
-            source_onchange(source, radio, graficos);
+            source_onchange(source, null, graficos);
         }
     }
 
