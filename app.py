@@ -645,7 +645,7 @@ def reducao(dirname):
         table.loc[idx,'mag'] = mag(table['flux'][idx]-med)
 
 
-    # Calculando índices das estrelas
+    # Calculando índices 2MASS das estrelas
     INDICES = {}
     INDICEO = {}
     # Índices de catálogo
@@ -675,17 +675,21 @@ def reducao(dirname):
         vstr = f"fitsV:{datadir['fitsV'][i]}"
         if hasR: rstr = f"fitsR:{datadir['fitsR'][i]}"
 
-        # Índices instrumentais
-        if hasB: idb =  ids & (table['banda'] == bstr)
-        idv = ids & (table['banda'] == vstr)
+        # Índices instrumentais das estrelas
+        if hasB: idb =  (table['banda'] == bstr) & ids
+        idv = (table['banda'] == vstr) & ids
         if hasR: idr = (table['banda'] == rstr) & ids
         if hasB: b = table['mag'][idb].values
         v = table['mag'][idv].values
-        if hasR: r = table['mag'][idr].values
-        if hasR: v_r = v-r 
-        if hasB: b_v = b-v
+        if hasR:
+            r = table['mag'][idr].values
+            v_r = v-r 
+        if hasB:
+            b_v = b-v
+            if not hasR:
+                B_b = B-b
 
-        # b, v e r instrumentais
+        # armazena b, v e r instrumentais
         if hasB: INDICES[f'b{i}'] = b
         INDICES[f'v{i}'] = v
         if hasR: INDICES[f'r{i}'] = r
@@ -693,7 +697,6 @@ def reducao(dirname):
         if hasB:
             INDICES[f'b-v_{i}'] = b_v
             if not hasR:
-                B_b = B-b
                 INDICES[f'B-b_{i}'] = B_b
         # v-r instrumental
         if hasR: INDICES[f'v-r_{i}'] = v_r
@@ -701,17 +704,22 @@ def reducao(dirname):
         V_v = V-v
         INDICES[f'V-v_{i}'] = V_v
 
-        # Índices de objeto
+        # Índices instrumentais do objeto
         if hasB: idb =  ido & (table['banda'] == bstr)
         idv = ido & (table['banda'] == vstr)
         if hasR: idr = (table['banda'] == rstr) & ido
+        # índice bₒ do objeto
         if hasB: bo = table['mag'][idb].values
+        # índice vₒ do objeto
         vo = table['mag'][idv].values
+        # índice rₒ do objeto
         if hasR: ro = table['mag'][idr].values
+        # índice vₒ-rₒ do objeto
         if hasR: v_ro = vo-ro 
+        # índice bₒ-vₒ do objeto
         if hasB: b_vo = bo-vo
 
-        # b, v e r instrumentais do objeto
+        # armazena b, v e r instrumentais do objeto
         if hasB: INDICEO[f'b{i}'] = bo
         INDICEO[f'v{i}'] = vo
         if hasR: INDICEO[f'r{i}'] = ro
@@ -744,7 +752,7 @@ def reducao(dirname):
         if hasB:
             Tbv.append(1./getcoef(S[['B-V',f'b-v_{i}']]))
             if not hasR:
-                Tb.append(getcoef(S[['B-V',f'B-b_{i}']]))
+                Tb.append(getcoef(S[[f'B-b_{i}','B-V']]))
 
     coef = pd.DataFrame()
     if hasB: coef['Tbv'] = Tbv
