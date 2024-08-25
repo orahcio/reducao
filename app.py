@@ -752,7 +752,7 @@ def reducao(dirname):
         if hasB:
             Tbv.append(1./getcoef(S[['B-V',f'b-v_{i}']]))
             if not hasR:
-                Tb.append(getcoef(S[[f'B-b_{i}','B-V']]))
+                Tb.append(getcoef(S[['B-V',f'B-b_{i}']]))
 
     coef = pd.DataFrame()
     if hasB: coef['Tbv'] = Tbv
@@ -768,7 +768,7 @@ def reducao(dirname):
         if hasB:
             b_v = S['B-V'].values + Tbv[i]*(O[f'b-v_{i}'].values - S[f'b-v_{i}'].values)
             if not hasR:
-                b = O[f'b{i}'].values + Tb[i]*(O[f'b-v_{i}'].values - S[f'b-v_{i}'].values)
+                b = O[f'b{i}'].values + S['B-b_{i}'].values +Tb[i]*(b_v - S[f'b-v_{i}'].values)
                 v = b-O[f'b-v_{i}'].values
         if hasR:
             v_r = S['V-R'].values + Tvr[i]*(O[f'v-r_{i}'].values - S[f'v-r_{i}'].values)
