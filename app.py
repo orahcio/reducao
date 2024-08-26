@@ -769,11 +769,12 @@ def reducao(dirname):
             b_v = S['B-V'].values + Tbv[i]*(O[f'b-v_{i}'].values - S[f'b-v_{i}'].values)
             if not hasR:
                 b = O[f'b{i}'].values + S[f'B-b_{i}'].values +Tb[i]*(b_v - S[f'b-v_{i}'].values)
-                v = b-O[f'b-v_{i}'].values
+                v = b-b_v
         if hasR:
             v_r = S['V-R'].values + Tvr[i]*(O[f'v-r_{i}'].values - S[f'v-r_{i}'].values)
             v = O['v'+str(i)].values + S[f'V-v_{i}'] + Tv[i]*(v_r - S['V-R'].values)
 
+        # Adicionar os objetos na estrutura de dado
         if hasB: OBJETO[f'b-v_{i}'] = b_v.tolist()
         if hasR: OBJETO[f'v-r_{i}'] = v_r.tolist()
         OBJETO[f'v_{i}'] = v.tolist()
