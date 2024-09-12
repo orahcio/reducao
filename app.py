@@ -104,6 +104,7 @@ def upload_file():
     # Definindo table da análise para serem salvos junto com os arquivos
     dirdata = dict(
         name = request.form.get('refname'),
+        wcsref = request.form.get('fileref'),
         r = 8
     )
 
@@ -136,19 +137,30 @@ def plotfits(dirname):
 
     r = dirdata['r']
     session['r'] = r
+
+    # Cabeçalho agora é especificado na entrada
     celestial = False
+    try:
+        img, header = fits.getdata(session['pathname']+dirdata['wcsref'], header=True)
+        session['wcs'] = session['pathname']+dirdata['wcsref']
+        celestial = WCS(header).has_celestial
+    except FileNotFoundError:
+        celestial = False
+        return f"Arquivo {dirdata['wcsref']} não corresponde a um nome válido, volte e corrija."
+
     # Faz logo algumas estatísticas da imagem
     for fil in BANDAS:
         for fname in dirdata[fil]:
             img, header = fits.getdata(session['pathname']+fname, header=True)
             session['stats'][f'{fil}:{fname}'] = sigma_clipped_stats(img,sigma=3.0)
 
-            if not celestial:
-                celestial = WCS(header).has_celestial
-                session['wcs'] = session['pathname']+fname
-                
             # a data de observação de cada imagem    
             session['date'][f'{fil}:{fname}'] = Time(header['DATE-OBS']).jd
+
+            # if not celestial:
+            #     celestial = WCS(header).has_celestial
+            #     session['wcs'] = session['pathname']+fname
+                
 
     # Tabela com os dados de coordenadas
     source = ColumnDataSource(dict(
