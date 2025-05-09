@@ -27,7 +27,7 @@ Preciso mexer para que o código seja adequado a versões mais novas, que tenha 
 
 ## Como usar
 
-![Tela principal do aplicativo, três colunas: a primeira tem controle de contraste da imagem, regulador do tamanhos do raio para abertura fotométrica e seletor de tipo de objeto; a segunda coluna tem a imagem e três botões acima dela para limpar as seleções de fontes na imagem, copiar as coordenadas da imagem de referência e salvar tabela; a terceira coluna possui intruções para fazer solução de placa com o nova.astrometry.net e um seletor para escolher a imagem de referência.](screenshot.jpeg)
+![Tela principal do aplicativo, três colunas: a primeira tem controle de contraste da imagem, regulador do tamanhos do raio para abertura fotométrica e seletor de tipo de objeto; a segunda coluna tem a imagem e três botões acima dela para limpar as seleções de fontes na imagem, copiar as coordenadas da imagem de referência e salvar tabela; a terceira coluna possui intruções para fazer solução de placa com o nova.astrometry.net e um seletor para escolher a imagem de referência.](./screenshot.jpeg)
 
 A tela inicial é um formulário muito simples para selecionar as imagens nos diferentes filtros _B_, _V_ e _R_. É possível selecionar mais de uma imagem `.fits` ou `.fit` para cada filtro. Ao submeter o formulário a tela acima será o ambiente para escolher as fontes de luz.
 
