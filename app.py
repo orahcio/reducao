@@ -1,7 +1,7 @@
 from bokeh.plotting import figure
 from bokeh.embed import components
 from bokeh.models import ColumnDataSource, DataTable, TableColumn, PointDrawTool, Spinner, WheelZoomTool,\
-    RadioGroup, CustomJS, Paragraph, Button, Slider, TextInput, Toggle, Div, Tabs, TabPanel, CDSView,\
+    RadioGroup, CustomJS, Paragraph, Button, Slider, TextInput, Toggle, Div, Tabs, Panel, CDSView,\
     GroupFilter, Select
 from bokeh.layouts import column, row
 from bokeh import __version__ as ver
@@ -28,8 +28,8 @@ from bs4 import BeautifulSoup
 from astroquery.ipac.irsa import Irsa
 
 from astropy.stats import sigma_clipped_stats
-from photutils import DAOStarFinder
-from photutils import CircularAperture, aperture_photometry
+from photutils.detection import DAOStarFinder
+from photutils.aperture import CircularAperture, aperture_photometry
 
 import statsmodels.formula.api as smf
 
@@ -39,6 +39,8 @@ import numpy as np
 
 import base64
 
+# Por conta do bokeh 2 para o 3
+TabPanel = Panel
 
 UPLOAD_FOLDER = './upfolder'
 ALLOWED_EXTENSIONS = ['fit', 'fits','corr']
