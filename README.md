@@ -12,13 +12,11 @@ Acrescentei as flags `--timeout 0` para desligar o tempo de 30s de requisição 
 
 ## Instalação
 
-Tentativa para fazer funcionar no _python 3.11.6_ e nas bibliotecas atualizadas para essa versão.
-
-Último teste bem sucedido foi com o _python 3.6.15_ e as bibliotecas podem ser instaladas com
+Último teste bem sucedido foi com o _python 3.11.6_, para fins de teste pode instalar as dependências com a linha a seguir.
 ```bash
 pip install bokeh colorcet flask numpy werkzeug astropy astroquery photutils statsmodels pandas openpyxl gunicorn xlrd
 ```
-ou
+porém, para instalar as versões funcionais a linha a seguir tem as versões das bibliotecas corretas para que o aplicativo possa rodar no _python 3.11.6_,
 ```bash
 pip install -r requirements.txt
 ```
