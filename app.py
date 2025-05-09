@@ -1,8 +1,9 @@
 from bokeh.plotting import figure
 from bokeh.embed import components
+from bokeh.events import ButtonClick
 from bokeh.models import ColumnDataSource, DataTable, TableColumn, PointDrawTool, Spinner, WheelZoomTool,\
     RadioGroup, CustomJS, Paragraph, Button, Slider, TextInput, Toggle, Div, Tabs, TabPanel, CDSView,\
-    GroupFilter, Select
+    GroupFilter, Select, OpenURL
 from bokeh.layouts import column, row
 from bokeh import __version__ as ver
 
@@ -78,42 +79,48 @@ def normal(valores):
 
 @app.route("/")
 def interface():
-    
+    '''
+    Essa função irá renderizar a página html que tem o formulário
+    que irá pegar os arquivos
+    '''
     return render_template("interface.html")
 
 
-# Caso precise transportar uma asrquivo no json abre ele com base64.b64decode(req['arquivo'])
-# salva o arquivo unsado 'wb' 
+# Caso precise transportar um arquivo no json abre ele com base64.b64decode(req['arquivo'])
+# salva o arquivo usando 'wb' 
 
 
-@app.route('/', methods=['GET', 'POST'])
+@app.route('/', methods=['POST'])
 def upload_file():
-    if request.method == 'POST':
-        pathname = app.config['UPLOAD_FOLDER']+'/'+request.form.get('refname')
-        if not os.path.exists(pathname):
-            os.mkdir(pathname)
+    '''
+    Essa função irá fazer upload dos arquivos e redirecionar para o
+    plot dos gráficos.
+    '''
 
-        # Definindo table da análise para serem salvos junto com os arquivos
-        dirdata = dict(
-            name = request.form.get('refname'),
-            r = 8
-        )
+    pathname = app.config['UPLOAD_FOLDER']+'/'+request.form.get('refname')
+    if not os.path.exists(pathname):
+        os.mkdir(pathname)
 
-        # Upload de arquivos e salvando table da sessão para serem salvosjuntos
-        for banda in request.files.keys():
-            dirdata[banda] = []
-            for ffit in request.files.getlist(banda):
-                if allowed_file(ffit.filename):
-                    filename = secure_filename(ffit.filename)
-                    ffit.save(os.path.join(pathname, filename))
-                    dirdata[banda].append(filename)
+    # Definindo table da análise para serem salvos junto com os arquivos
+    dirdata = dict(
+        name = request.form.get('refname'),
+        wcsref = request.form.get('fileref'),
+        r = 8
+    )
 
-        with open(pathname+'/data.json', 'w') as f:
-            json.dump(dirdata,f)
+    # Upload de arquivos e salvando table da sessão para serem salvosjuntos
+    for banda in request.files.keys():
+        dirdata[banda] = []
+        for ffit in request.files.getlist(banda):
+            if allowed_file(ffit.filename):
+                filename = secure_filename(ffit.filename)
+                ffit.save(os.path.join(pathname, filename))
+                dirdata[banda].append(filename)
 
-        return redirect(url_for('plotfits',dirname=dirdata['name']))
+    with open(pathname+'/data.json', 'w') as f:
+        json.dump(dirdata,f)
 
-    # return redirect(url_for('interface'))
+    return redirect(url_for('plotfits',dirname=dirdata['name']))
 
 
 @app.route('/plot/<dirname>')
@@ -130,19 +137,30 @@ def plotfits(dirname):
 
     r = dirdata['r']
     session['r'] = r
+
+    # Cabeçalho agora é especificado na entrada
     celestial = False
+    try:
+        img, header = fits.getdata(session['pathname']+dirdata['wcsref'], header=True)
+        session['wcs'] = session['pathname']+dirdata['wcsref']
+        celestial = WCS(header).has_celestial
+    except FileNotFoundError:
+        celestial = False
+        return f"Arquivo {dirdata['wcsref']} não corresponde a um nome válido, volte e corrija."
+
     # Faz logo algumas estatísticas da imagem
     for fil in BANDAS:
         for fname in dirdata[fil]:
             img, header = fits.getdata(session['pathname']+fname, header=True)
-            session['stats'][fil+':'+fname] = sigma_clipped_stats(img,sigma=3.0)
+            session['stats'][f'{fil}:{fname}'] = sigma_clipped_stats(img,sigma=3.0)
 
-            if not celestial:
-                celestial = WCS(header).has_celestial
-                session['wcs'] = session['pathname']+fname
+            # a data de observação de cada imagem    
+            session['date'][f'{fil}:{fname}'] = Time(header['DATE-OBS']).jd
+
+            # if not celestial:
+            #     celestial = WCS(header).has_celestial
+            #     session['wcs'] = session['pathname']+fname
                 
-            session['date'][fil+':'+fname] = Time(header['DATE-OBS']).jd # a data de observação de cada imagem
-
 
     # Tabela com os dados de coordenadas
     source = ColumnDataSource(dict(
@@ -215,7 +233,7 @@ def plotfits(dirname):
     # tabs_onchange(cb_obj);
     # '''))
 
-    contrast = Slider(start=-1, end=36, value=1, step=0.5, title="Contraste")
+    contrast = Slider(start=-1, end=36, width=250, value=1, step=0.5, title="Contraste")
     contrast.js_on_change('value',CustomJS(args = dict(tabs=graficos, im=Nimg), code = '''
     contrast_onchange(cb_obj,tabs,im);
     '''))
@@ -240,8 +258,8 @@ def plotfits(dirname):
     text1 = Div(text='<b>Instruções:</b><p>1. Digite a chave do Astrometry.net')
     apikey_input = TextInput(title='Apikey do Astrometry.net', placeholder='digite a chave aqui')
 
-    text2 = Div(text='''<p>2. Selecione qual imagem será usada como referência para o astrometry.net e
-    para o cálculo das coordenadas celestes</p>''')
+    text2 = Div(text='''<p>2. Selecione qual imagem será usada como referência para o\
+                astrometry.net e para o cálculo das coordenadas celestes</p>''')
     seletor = Select(title='Escolha a imagem de referência', options=[*session['stats'].keys()])
 
     text3 = Div(text='3. Clique abaixo pra requisitar a correção WCS')
@@ -266,12 +284,15 @@ def plotfits(dirname):
     copiar.js_on_click(CustomJS(args=dict(source=source, ref=seletor, radio=radio_group, active=graficos), code='''
     add_data(source,ref,radio,active);
     '''))
-
-    div, script = components(row(column(contrast,spinner,radio_title,radio_group),\
-        column(row(reset,copiar,salvar), graficos, tabela, sizing_mode='stretch_both'),
-        column(text1,apikey_input,text2,seletor,text3,send_astrometry,text4)))
-    # div, script = components(row(column(contrast,spinner,radio_title,radio_group),\
-    #                              column(graficos)))
+    
+    reduzir = Button(label='Reduzir', button_type='primary')
+    reduzir.js_on_click(CustomJS(args=dict(base=request.url_root, dirname=dirname), code='''
+    window.open(base+"reducao/"+dirname,"_self");
+    '''))
+    print("URL: ", f"{request.url_root}reducao/{dirname}")
+    div, script = components(row(column(contrast,spinner,radio_title,radio_group, reset,copiar,salvar, width=300),\
+        column(graficos, tabela, sizing_mode='scale_width'),\
+        column(text1,apikey_input,text2,seletor,text3,send_astrometry,text4, reduzir, width=200)))
 
     return render_template('plot.html', the_div=div, the_script=script,filename=dirdata['name'],bokeh=ver)
 
@@ -590,7 +611,8 @@ def getcoef(data, q=0.5):
 @app.route('/reducao/<dirname>')
 def reducao(dirname):
     '''
-    Faz a redução de table caso exista a tabela com os table
+    Faz a redução de table caso exista a tabela. A redução é feita
+    conforme a combinção BVR, VR ou BV.
     '''
     filepath = f"{app.config['UPLOAD_FOLDER']}/{dirname}/data.xlsx"
     output = f"{app.config['UPLOAD_FOLDER']}/{dirname}/result.xlsx"
@@ -601,11 +623,25 @@ def reducao(dirname):
     # try:
     with open(filedata) as f:
         datadir = json.load(f)
+        hasB = len(datadir['fitsB']) > 0
+        hasR = len(datadir['fitsR']) > 0
+    print('B: ', hasB, '. R: ',hasR)
+    if hasB:
+        if not hasR:
+            print('Tem B e não tem R')
+
     print('abriu data.json')
     #                               Adicionei essa parte para remover duplicatas que porventura surgiram na hora de clicar
     #                                                       Essas colunas garantem que só uma fonte distinta sobreviva na tabela
-    table = pd.read_excel(filepath).drop_duplicates(subset=['sid','banda','j','k','flux'], keep='first')
+    try:
+        table = pd.read_excel(filepath).drop_duplicates(subset=['sid','banda','j','k','flux'], keep='first')
+        if len(table.index) <= 0:
+            return "Salve a tabela antes para redução, ela estava sem dados"
+    except FileNotFoundError:
+        return "Salve a tabela antes para redução, arquivo não encontrado"
+    
     table['mag'] = 0.0 # criando a coluna de magnitudes, não pode iniciar como inteiro, pois vai receber float
+    
 
     # Selecionando estrelas dentro do intervalo
     ids = table['tipo']=='src' # índices pra selecionar estrelas
@@ -621,103 +657,138 @@ def reducao(dirname):
         table.loc[idx,'mag'] = mag(table['flux'][idx]-med)
 
 
-    # Calculando índices das estrelas
+    # Calculando índices 2MASS das estrelas
     INDICES = {}
     INDICEO = {}
     # Índices de catálogo
-    idref = (table['banda'] == 'fitsR:'+datadir['fitsR'][-1]) & ids
+    idref = (table['banda'] == 'fitsV:'+datadir['fitsV'][-1]) & ids
     j = table['j'][idref]
     INDICES['j'] = j.values
     k = table['k'][idref]
     INDICES['k'] = k.values
     j_k = j-k
     INDICES['j-k'] = j_k.values
-    B_V = 0.2807*j_k**3 - 0.4535*j_k**2 + 1.7006*j_k + 0.0484
-    INDICES['B-V'] = B_V.values
-    V_R = 0.3458*j_k**3 - 0.5401*j_k**2 + 1.0038*j_k + 0.0451
-    INDICES['V-R'] = V_R.values
+    if hasR:
+        V_R = 0.3458*j_k**3 - 0.5401*j_k**2 + 1.0038*j_k + 0.0451
+        INDICES['V-R'] = V_R.values
     V = 1.4688*j_k**3 - 2.325*j_k**2 + 3.5143*j_k + 0.1496 + j
     INDICES['V'] = V.values
+    if hasB:
+        B_V = 0.2807*j_k**3 - 0.4535*j_k**2 + 1.7006*j_k + 0.0484
+        INDICES['B-V'] = B_V.values
+        if not hasR:
+            B = B_V.values+V.values
+            INDICES['B'] = B
 
     # Construindo tabela lado a lado
 
-    for i in range(len(datadir['fitsR'])):
-        bstr = f"fitsB:{datadir['fitsB'][i]}"
+    for i in range(len(datadir['fitsV'])):
+        if hasB: bstr = f"fitsB:{datadir['fitsB'][i]}"
         vstr = f"fitsV:{datadir['fitsV'][i]}"
-        rstr = f"fitsR:{datadir['fitsR'][i]}"
+        if hasR: rstr = f"fitsR:{datadir['fitsR'][i]}"
 
-        # Índices instrumentais
-        idb =  ids & (table['banda'] == bstr)
-        idv = ids & (table['banda'] == vstr)
-        idr = (table['banda'] == rstr) & ids
-        b = table['mag'][idb].values
+        # Índices instrumentais das estrelas
+        if hasB: idb =  (table['banda'] == bstr) & ids
+        idv = (table['banda'] == vstr) & ids
+        if hasR: idr = (table['banda'] == rstr) & ids
+        if hasB: b = table['mag'][idb].values
         v = table['mag'][idv].values
-        r = table['mag'][idr].values
-        v_r = v-r 
-        b_v = b-v
+        if hasR:
+            r = table['mag'][idr].values
+            v_r = v-r 
+        if hasB:
+            b_v = b-v
+            if not hasR:
+                B_b = B-b
 
-        # b, v e r instrumentais
-        INDICES[f'b{i}'] = b
+        # armazena b, v e r instrumentais
+        if hasB: INDICES[f'b{i}'] = b
         INDICES[f'v{i}'] = v
-        INDICES[f'r{i}'] = r
+        if hasR: INDICES[f'r{i}'] = r
         # b-v instrumental
-        INDICES[f'b-v_{i}'] = b_v
+        if hasB:
+            INDICES[f'b-v_{i}'] = b_v
+            if not hasR:
+                INDICES[f'B-b_{i}'] = B_b
         # v-r instrumental
-        INDICES[f'v-r_{i}'] = v_r
+        if hasR: INDICES[f'v-r_{i}'] = v_r
         # V-v instrumental
         V_v = V-v
         INDICES[f'V-v_{i}'] = V_v
 
-        # Índices de objeto
-        idb =  ido & (table['banda'] == bstr)
+        # Índices instrumentais do objeto
+        if hasB: idb =  ido & (table['banda'] == bstr)
         idv = ido & (table['banda'] == vstr)
-        idr = (table['banda'] == rstr) & ido
-        bo = table['mag'][idb].values
+        if hasR: idr = (table['banda'] == rstr) & ido
+        # índice bₒ do objeto
+        if hasB: bo = table['mag'][idb].values
+        # índice vₒ do objeto
         vo = table['mag'][idv].values
-        ro = table['mag'][idr].values
-        v_ro = vo-ro 
-        b_vo = bo-vo
+        # índice rₒ do objeto
+        if hasR: ro = table['mag'][idr].values
+        # índice vₒ-rₒ do objeto
+        if hasR: v_ro = vo-ro 
+        # índice bₒ-vₒ do objeto
+        if hasB: b_vo = bo-vo
 
-        # b, v e r instrumentais do objeto
-        INDICEO[f'b{i}'] = bo
+        # armazena b, v e r instrumentais do objeto
+        if hasB: INDICEO[f'b{i}'] = bo
         INDICEO[f'v{i}'] = vo
-        INDICEO[f'r{i}'] = ro
+        if hasR: INDICEO[f'r{i}'] = ro
         # b-v instrumental
-        INDICEO[f'b-v_{i}'] = b_vo
+        if hasB: INDICEO[f'b-v_{i}'] = b_vo
         # v-r instrumental
-        INDICEO[f'v-r_{i}'] = v_ro
+        if hasR: INDICEO[f'v-r_{i}'] = v_ro
 
-        S = pd.DataFrame(INDICES)
-        S.to_excel(output)
-        O = pd.DataFrame(INDICEO)
-        O.to_excel('.'+output.strip(r'.xlsx')+'_obj.xlsx')
+    S = pd.DataFrame(INDICES)
+    print("S: ", S['V'])
+    S.to_excel(output)
+    O = pd.DataFrame(INDICEO)
+    O.to_excel(f".{output.strip(r'.xlsx')}_obj.xlsx")
 
     # pegando coeficientes
-    Tvr = []; Tv = []; Tbv = []
-    for i in range(len(datadir['fitsR'])):
-        # Tvr é o coeficiente inverso de v-r vs. V-R
-        Tvr.append(1./getcoef(S[['V-R',f'v-r_{i}']]))
-        # Tv é o coeficiente de V-v vs. V-R
-        Tv.append(getcoef(S[['V-R',f'V-v_{i}']]))
+    if hasR:
+        Tvr = []
+        Tv = []
+    if hasB:
+        Tbv = []
+        if not hasR:
+            Tb = []
+    for i in range(len(datadir['fitsV'])):
+        if hasR:
+            # Tvr é o coeficiente inverso de v-r vs. V-R
+            Tvr.append(1./getcoef(S[['V-R',f'v-r_{i}']]))
+            # Tv é o coeficiente de V-v vs. V-R
+            Tv.append(getcoef(S[['V-R',f'V-v_{i}']]))
         # Tbv é o inverso do coeficiente de b-v vs. B-V
-        Tbv.append(1./getcoef(S[['B-V',f'b-v_{i}']]))
+        if hasB:
+            Tbv.append(1./getcoef(S[['B-V',f'b-v_{i}']]))
+            if not hasR:
+                Tb.append(getcoef(S[['B-V',f'B-b_{i}']]))
 
-    coef = pd.DataFrame(dict(
-        Tvr = Tvr,
-        Tv = Tv,
-        Tbv = Tbv
-    ))
+    coef = pd.DataFrame()
+    if hasB: coef['Tbv'] = Tbv
+    if hasR:
+        coef['Tv'] = Tv
+        coef['Tvr'] = Tvr
+
     coef.to_excel('.'+output.strip(r'.xlsx')+'_coef.xlsx')
 
-    # Colcular os índices do objeto
+    # Calcular os índices do objeto
     OBJETO = {}
-    for i in range(len(datadir['fitsR'])):
-        b_v = S['B-V'].values + Tbv[i]*(O[f'b-v_{i}'].values - S[f'b-v_{i}'].values)
-        v_r = S['V-R'].values + Tvr[i]*(O[f'v-r_{i}'].values - S[f'v-r_{i}'].values)
-        v   = O['v'+str(i)].values + S[f'V-v_{i}'] + Tv[i]*(v_r - S['V-R'].values)
+    for i in range(len(datadir['fitsV'])):
+        if hasB:
+            b_v = S['B-V'].values + Tbv[i]*(O[f'b-v_{i}'].values - S[f'b-v_{i}'].values)
+            if not hasR:
+                b = O[f'b{i}'].values + S[f'B-b_{i}'].values +Tb[i]*(b_v - S[f'b-v_{i}'].values)
+                v = b-b_v
+        if hasR:
+            v_r = S['V-R'].values + Tvr[i]*(O[f'v-r_{i}'].values - S[f'v-r_{i}'].values)
+            v = O['v'+str(i)].values + S[f'V-v_{i}'] + Tv[i]*(v_r - S['V-R'].values)
 
-        OBJETO[f'b-v_{i}'] = b_v.tolist()
-        OBJETO[f'v-r_{i}'] = v_r.tolist()
+        # Adicionar os objetos na estrutura de dado
+        if hasB: OBJETO[f'b-v_{i}'] = b_v.tolist()
+        if hasR: OBJETO[f'v-r_{i}'] = v_r.tolist()
         OBJETO[f'v_{i}'] = v.tolist()
 
     TEMPO = {}
@@ -728,7 +799,7 @@ def reducao(dirname):
     table = pd.DataFrame(OBJETO)
     juliantable = pd.DataFrame(TEMPO, index=[0])
 
-    with pd.ExcelWriter('.'+output.strip(r'.xlsx')+'_objstar.xlsx') as writer:
+    with pd.ExcelWriter(f".{output.strip(r'.xlsx')}_objstar.xlsx") as writer:
         print(table)
         table.to_excel(writer)
         juliantable.to_excel(writer,startrow=len(v.tolist()))
@@ -744,10 +815,6 @@ def reducao(dirname):
     - <a href="{url3}">tabela de coeficientes</a>;<br>
     - <a href="{url4}">tabela de índices do objeto com as estrelas</a>.
     '''
-    # Copiando as estrelas que
-
-    #except FileNotFoundError:
-    #    return 'Arquivo não encontrado, salve a tabela.'
 
 
 def main():
