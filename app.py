@@ -29,8 +29,8 @@ from bs4 import BeautifulSoup
 from astroquery.ipac.irsa import Irsa
 
 from astropy.stats import sigma_clipped_stats
-from photutils import DAOStarFinder
-from photutils import CircularAperture, aperture_photometry
+from photutils.detection import DAOStarFinder
+from photutils.aperture import CircularAperture, aperture_photometry
 
 import statsmodels.formula.api as smf
 
