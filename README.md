@@ -19,6 +19,7 @@ pip install bokeh colorcet flask numpy werkzeug astropy astroquery photutils sta
 porém, para instalar as versões funcionais a linha a seguir tem as versões das bibliotecas corretas para que o aplicativo possa rodar no _python 3.11.6_,
 ```bash
 pip install -r requirements.txt
+```
 
 Consegui rodar no Guix System usando o comando, deixei um `manifest.scm` para os requisitos.
 ```bash
